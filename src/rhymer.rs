@@ -28,9 +28,10 @@ pub struct Request {
 // Per-server data passed on to Rhymer.
 #[derive(Debug, Clone)]
 pub struct Context {
+    pub config: ServerConfig,
     pub db: Database,
     // pub func: FunctionManager,
-    //pub file: FileManeger,
+    // pub file: FileManeger,
 }
 
 fn with_context(
@@ -123,7 +124,7 @@ impl Server {
     pub async fn from_option(config: ServerConfig) -> Self {
         let context = Arc::new(Context {
             db: Database::from_url(config.database_url.clone()).await,
-            //func: Functions::default(),
+            config: config.clone(), //func: Functions::default(),
         });
         Server { config, context }
     }

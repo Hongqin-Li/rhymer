@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use crate::{
     database::{self, Database},
-    error::{internal_server_error, unauthorized},
+    error::{self, internal_server_error, unauthorized},
     object,
     rhymer::{Context, Request},
     validator::ClassName,
@@ -10,7 +10,7 @@ use crate::{
 };
 use mongodb::bson::{doc, Document};
 use serde::{Deserialize, Serialize};
-use warp::{Rejection, Reply, reject::Reject};
+use warp::{reject::Reject, Rejection, Reply};
 
 use jsonwebtoken::{DecodingKey, EncodingKey, Header, Validation};
 
@@ -56,35 +56,41 @@ impl User {
             .db
             .retrieve("_User", filter, UserKind::Master)
             .await
-            .map_or_else(|e| Err(e), |v| {
-                if let Some(d) = v.first() {
-                    if let Ok(id) = d.get_object_id(database::OBJECT_ID) {
-                        let id = id.to_string();
-                        let token = ClientToken {
-                            sub: id.clone(),
-                            exp: 10, // FIXME: use context config
-                            id,
-                            name: name.to_owned(),
-                        };
-                        self.kind = UserKind::Client(token.clone());
-                        Ok(token)
+            .map_or_else(
+                |e| Err(e),
+                |v| {
+                    if let Some(d) = v.first() {
+                        if let Ok(id) = d.get_object_id(database::OBJECT_ID) {
+                            let id = id.to_string();
+                            let token = ClientToken {
+                                sub: id.clone(),
+                                exp: 10, // FIXME: use context config
+                                id,
+                                name: name.to_owned(),
+                            };
+                            self.kind = UserKind::Client(token.clone());
+                            Ok(token)
+                        } else {
+                            unauthorized("")
+                        }
                     } else {
                         unauthorized("")
                     }
-                } else {
-                    unauthorized("")
-                }
-            })
+                },
+            )
     }
 }
 
-pub fn encode_token(t: &ClientToken, key: &str) -> String {
+pub fn encode_token(t: &ClientToken, key: &str) -> Result<String, Rejection> {
     jsonwebtoken::encode(
         &Header::default(),
         &t,
         &EncodingKey::from_secret(key.as_bytes()),
     )
-    .expect("should not failed when encode jwt")
+    .map_or_else(
+        |e| error::internal_server_error("Error when encoding JWT"),
+        |s| Ok(s),
+    )
 }
 
 pub fn decode_token(s: &str, key: &str) -> Option<ClientToken> {
@@ -130,15 +136,11 @@ pub async fn login(
     req: Request,
     ctx: Arc<Context>,
 ) -> Result<impl Reply, Rejection> {
+    let secret = ctx.config.secret.clone();
     let mut user = User::with_context(ctx);
-    let token_result = user.login(&q.username, &q.password).await.map_or_else(
+    let result = user.login(&q.username, &q.password).await.map_or_else(
         |e| unauthorized("User not found or password error"),
-        |t| {
-            serde_json::to_string(&t).map_or_else(
-                |e| internal_server_error("Cannot serialize token"),
-                |s| Ok(s),
-            )
-        },
+        |t| encode_token(&t, &secret),
     );
-    token_result
+    result
 }

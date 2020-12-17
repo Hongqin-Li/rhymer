@@ -1,8 +1,7 @@
-
 use warp::Reply;
 use warp::{
-    reject::{self, Reject},
     hyper::StatusCode,
+    reject::{self, Reject},
     Rejection,
 };
 
