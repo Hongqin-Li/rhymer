@@ -1,15 +1,14 @@
 use crate::{
     acl::Acl,
-    database::{self, Database as _, Mongodb as Database},
+    database::{self, Database as _},
     error::{self, internal_server_error},
-    rhymer::{Context, Request},
+    server::{Context, Request},
     user::UserKind,
     validator::ClassName,
 };
-use error::not_found;
+use error::{bad_request, not_found};
 use mongodb::bson::{doc, Document};
 use std::{result::Result, sync::Arc};
-use tokio::stream::StreamExt;
 use warp::{Rejection, Reply};
 
 pub struct Object {
@@ -79,36 +78,41 @@ impl Object {
 }
 
 pub async fn create(
-    class: ClassName,
-    doc: Document,
     req: Request,
     ctx: Arc<Context>,
+    class: ClassName,
 ) -> Result<impl Reply, Rejection> {
-    ctx.db
-        .create(class.get_name(), doc, req.user)
-        .await
-        .and_then(|d| {
-            serde_json::to_string(&d).map_or_else(|e| internal_server_error(""), |s| Ok(s))
-        })
+    if let Some(body) = req.body {
+        ctx.db
+            .create(class.get_name(), body, req.user)
+            .await
+            .and_then(|d| {
+                serde_json::to_string(&d)
+                    .map_or_else(|_e| internal_server_error("Serialization error"), |s| Ok(s))
+            })
+    } else {
+        bad_request("Body not found")
+    }
 }
 
 pub async fn retrieve_by_filter(
-    class: ClassName,
-    filter: Document,
     req: Request,
     ctx: Arc<Context>,
+    class: ClassName,
+    filter: Document,
 ) -> Result<impl Reply, Rejection> {
     let result = ctx.db.retrieve(class.get_name(), filter, req.user).await;
     result.and_then(|v| {
-        serde_json::to_string(&v).map_or_else(|e| internal_server_error(""), |s| Ok(s))
+        serde_json::to_string(&v)
+            .map_or_else(|_e| internal_server_error("Serialization error"), |s| Ok(s))
     })
 }
 
 pub async fn retrieve(
-    class: ClassName,
-    id: String,
     req: Request,
     ctx: Arc<Context>,
+    class: ClassName,
+    id: String,
 ) -> Result<impl Reply, Rejection> {
     let filter = doc! {database::OBJECT_ID: id };
     let result = ctx.db.retrieve(class.get_name(), filter, req.user).await;
@@ -116,7 +120,8 @@ pub async fn retrieve(
         |e| Err(e),
         |v| {
             if let Some(v) = v.first() {
-                serde_json::to_string(v).map_or_else(|e| internal_server_error(""), |s| Ok(s))
+                serde_json::to_string(v)
+                    .map_or_else(|_e| internal_server_error("Serialization error"), |s| Ok(s))
             } else if v.len() == 0 {
                 not_found("")
             } else {
@@ -127,30 +132,35 @@ pub async fn retrieve(
 }
 
 pub async fn update(
-    class: ClassName,
-    id: String,
-    doc: Document,
     req: Request,
     ctx: Arc<Context>,
+    class: ClassName,
+    id: String,
 ) -> Result<impl Reply, Rejection> {
-    ctx.db
-        .update(class.get_name(), &id, doc, req.user)
-        .await
-        .and_then(|d| {
-            serde_json::to_string(&d).map_or_else(|e| internal_server_error(""), |s| Ok(s))
-        })
+    if let Some(body) = req.body {
+        ctx.db
+            .update(class.get_name(), &id, body, req.user)
+            .await
+            .and_then(|d| {
+                serde_json::to_string(&d)
+                    .map_or_else(|_e| internal_server_error("Serialization error"), |s| Ok(s))
+            })
+    } else {
+        bad_request("Body not found")
+    }
 }
 
 pub async fn delete(
-    class: ClassName,
-    id: String,
     req: Request,
     ctx: Arc<Context>,
+    class: ClassName,
+    id: String,
 ) -> Result<impl Reply, Rejection> {
     ctx.db
         .delete(class.get_name(), &id, req.user)
         .await
         .and_then(|d| {
-            serde_json::to_string(&d).map_or_else(|e| internal_server_error(""), |s| Ok(s))
+            serde_json::to_string(&d)
+                .map_or_else(|_e| internal_server_error("Serialization error"), |s| Ok(s))
         })
 }

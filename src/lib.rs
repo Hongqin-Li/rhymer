@@ -9,10 +9,10 @@ mod database;
 mod error;
 mod function;
 mod object;
-mod rhymer;
+mod server;
 mod user;
 mod validator;
 
-pub use rhymer::Server;
-pub use rhymer::ServerConfig;
+pub use server::Server;
+pub use server::ServerConfig;
 pub use warp;

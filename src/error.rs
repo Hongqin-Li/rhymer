@@ -26,6 +26,13 @@ pub fn unauthorized<T>(msg: impl Into<String>) -> Result<T, Rejection> {
     }))
 }
 
+pub fn bad_request<T>(msg: impl Into<String>) -> Result<T, Rejection> {
+    Err(reject::custom(Error {
+        message: msg.into(),
+        code: StatusCode::BAD_REQUEST,
+    }))
+}
+
 pub fn internal_server_error<T>(msg: impl Into<String>) -> Result<T, Rejection> {
     Err(reject::custom(Error {
         message: msg.into(),
