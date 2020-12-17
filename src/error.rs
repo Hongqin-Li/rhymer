@@ -1,9 +1,8 @@
-use std::convert::Infallible;
 
 use warp::Reply;
 use warp::{
-    hyper::{Response, StatusCode},
     reject::{self, Reject},
+    hyper::StatusCode,
     Rejection,
 };
 

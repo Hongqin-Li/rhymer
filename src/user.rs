@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use crate::{
-    database::Database,
+    database::{self, Database},
     error::{internal_server_error, unauthorized},
     object,
     rhymer::{Context, Request},
@@ -10,7 +10,7 @@ use crate::{
 };
 use mongodb::bson::{doc, Document};
 use serde::{Deserialize, Serialize};
-use warp::{Rejection, Reply};
+use warp::{Rejection, Reply, reject::Reject};
 
 use jsonwebtoken::{DecodingKey, EncodingKey, Header, Validation};
 
@@ -50,16 +50,15 @@ impl User {
         result
     }
 
-    pub async fn login(&mut self, name: &str, pwd: &str) -> Result<ClientToken, ()> {
+    pub async fn login(&mut self, name: &str, pwd: &str) -> Result<ClientToken, Rejection> {
         let filter = doc! {"username": name, "password": pwd};
         (*self.ctx)
             .db
             .retrieve("_User", filter, UserKind::Master)
             .await
-            .map_or(Err(()), |v| {
+            .map_or_else(|e| Err(e), |v| {
                 if let Some(d) = v.first() {
-                    let id = d.get_object_id("ObjectId");
-                    if let Ok(id) = d.get_object_id("ObjectId") {
+                    if let Ok(id) = d.get_object_id(database::OBJECT_ID) {
                         let id = id.to_string();
                         let token = ClientToken {
                             sub: id.clone(),
@@ -70,10 +69,10 @@ impl User {
                         self.kind = UserKind::Client(token.clone());
                         Ok(token)
                     } else {
-                        Err(())
+                        unauthorized("")
                     }
                 } else {
-                    Err(())
+                    unauthorized("")
                 }
             })
     }

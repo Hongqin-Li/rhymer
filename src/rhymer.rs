@@ -1,4 +1,3 @@
-#[warn(missing_docs)]
 use std::{convert::Infallible, sync::Arc};
 
 use mongodb::bson::Document;
@@ -8,7 +7,7 @@ use warp::{Filter, Rejection};
 
 use crate::{
     database::{Database as _, Mongodb as Database},
-    error::{self, internal_server_error},
+    error,
     function::{Function, Functions},
     object::{self, Object},
     user::{self, User, UserKind},
@@ -69,31 +68,45 @@ fn with_req(key: String) -> impl Filter<Extract = (Request,), Error = Rejection>
     )
 }
 
+/// The server
 #[derive(Clone)]
 pub struct Server {
     config: ServerConfig,
     context: Arc<Context>,
 }
 
-// Used by hooks and functions
+// Rhymer server instance, which is passed to server-side hooks and functions.
 impl Server {
+    /// Login with username and password
     pub async fn login(&self, name: &str, pwd: &str) -> Result<User, ()> {
         let mut u = User::with_context(self.context.clone());
-        u.login(name, pwd).await.map(|t| u)
+        u.login(name, pwd).await.map_or_else(|e| Err(()), |t| Ok(u))
     }
+
+    /// Create an object in specific class
     pub fn object(&self, class: &str) -> Object {
-        todo!();
+        Object::from(self.context.clone(), UserKind::Master)
     }
-    pub fn f() -> Function {
+
+    /// Run a function by name
+    pub fn f(&self, name: &str) -> Function {
         unimplemented!();
     }
 }
 
+/// Server configuration
 #[derive(Debug, Clone)]
 pub struct ServerConfig {
+    /// port
     pub port: u16,
+
+    /// The secret will be used to create JWT and should not
+    /// be available to client.
     pub secret: String,
+    /// MongoDB url of form `mongodb://USERNAME:PASSWORD@localhost:27017/DATABASE_NAME`
     pub database_url: String,
+
+    /// Maximum legal body size in bytes.
     pub body_limit: u64,
 }
 
@@ -106,6 +119,7 @@ impl Server {
             .and(with_context(self.context.clone()))
     }
 
+    /// Create a server from option
     pub async fn from_option(config: ServerConfig) -> Self {
         let context = Arc::new(Context {
             db: Database::from_url(config.database_url.clone()).await,
@@ -113,6 +127,35 @@ impl Server {
         });
         Server { config, context }
     }
+
+    /// Run a server
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use pretty_env_logger;
+    /// use rhymer::{Server, ServerConfig};
+    /// use tokio;
+
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     pretty_env_logger::init();
+    ///     let mongo_user = "openbaas";
+    ///     let mongo_pwd = "openbaas";
+    ///     let mongo_db = "dev";
+    ///     let mut r = Server::from_option(ServerConfig {
+    ///         port: 8086,
+    ///         secret: "YOU WILL NEVER KNOWN".to_owned(),
+    ///         database_url: format!(
+    ///             "mongodb://{}:{}@localhost:27017/{}",
+    ///             mongo_user, mongo_pwd, mongo_db
+    ///         ),
+    ///         body_limit: 16 * 1024,
+    ///     })
+    ///     .await;
+    ///     r.run().await;
+    /// }
+    /// ```
     pub async fn run(&mut self) {
         let signup = warp::post()
             .and(warp::path("users"))
