@@ -1,5 +1,5 @@
 use crate::{
-    error::{self, internal_server_error},
+    error::{self, bad_request, internal_server_error, not_found},
     user::UserKind,
 };
 use chrono::Utc;
@@ -78,6 +78,27 @@ impl Mongodb {
             doc.insert(UPDATED_AT, t);
         }
         doc
+    }
+
+    // FIXME: dfs
+    /// Convert `objectId` field to `_id`
+    fn inner_filter(mut filter: Document) -> Result<Document, Rejection> {
+        if let Some(v) = filter.remove(OBJECT_ID) {
+            match v.as_str() {
+                None => return bad_request("Unexpected non-string objectId field"),
+                Some(id) => {
+                    match mongodb::bson::oid::ObjectId::with_string(id) {
+                        Ok(oid) => {
+                            filter.insert(Self::ID, oid);
+                        }
+                        Err(e) => {
+                            return not_found("Object not found");
+                        }
+                    };
+                }
+            };
+        }
+        Ok(filter)
     }
 
     /// Read filter for certain user in MongoDB
@@ -197,6 +218,8 @@ impl Database for Mongodb {
         filter: Document,
         user: UserKind,
     ) -> Result<Vec<Document>, Rejection> {
+        let filter = Self::inner_filter(filter)?;
+
         let filter = doc!["$and": vec![filter, Self::read_filter(&user)]];
         trace!("retrieve {:?} with filter {:?}", class, filter);
         let mut cursor = self.db.collection(class).find(filter, None).await.unwrap();
@@ -213,7 +236,7 @@ impl Database for Mongodb {
         Ok(docs)
     }
 
-    /// Update a document in specific class with id by user.
+    /// Update a document in specific class with id by user and return the document before updating.
     ///
     /// Master user can update with document of any content,
     /// while others updating `objectId` and `acl` field will be rejected.
@@ -224,21 +247,33 @@ impl Database for Mongodb {
         mut doc: Document,
         user: UserKind,
     ) -> Result<Document, Rejection> {
+        let req_doc = doc.clone();
         match user {
             UserKind::Master => {
                 // Master can update with any document
             }
             _ => {
-                // Client and Guest cannot update ACL
-                doc.remove(ACL);
+                // Client and Guest cannot update ACL and objectId
+                if let Some(x) = doc.remove(ACL) {
+                    return bad_request("Cannot update ACL");
+                }
+                if let Some(x) = doc.remove(OBJECT_ID) {
+                    return bad_request("Cannot update objectId");
+                }
             }
         }
 
-        let oid = mongodb::bson::oid::ObjectId::with_string(id).unwrap();
+        if doc.is_empty() {
+            return bad_request("Cannot update with empty data");
+        }
 
-        let mut filter = Self::write_filter(&user);
-        filter.insert(Self::ID, oid);
+        Self::update_doc(&mut doc, Utc::now());
 
+        let oid = mongodb::bson::oid::ObjectId::with_string(id)
+            .map_or_else(|e| not_found("Object ID invalid"), |d| Ok(d))?;
+
+        let filter = doc! {Self::ID: oid};
+        let filter = doc!["$and": vec![filter, Self::write_filter(&user)]];
         trace!(
             "update {:?} by id {:?} with with {:?} filtered by {:?}",
             class,
@@ -254,15 +289,24 @@ impl Database for Mongodb {
             .await;
 
         match result {
-            Ok(Some(doc)) => Ok(doc),
+            Ok(Some(doc)) => {
+                let doc = Self::expose(doc);
+                trace!("update result: {}", doc);
+                Ok(doc)
+            }
             Ok(None) => error::not_found("Object not found"),
-            Err(_) => error::internal_server_error("Unexpected query error"),
+            Err(e) => {
+                error!("update error {}", e);
+                error::internal_server_error("Unexpected query error")
+            }
         }
     }
 
     async fn delete(&self, class: &str, id: &str, user: UserKind) -> Result<Document, Rejection> {
         trace!("delete {:?} by id {:?}", class, id);
-        let oid = mongodb::bson::oid::ObjectId::with_string(id).unwrap();
+        let oid = mongodb::bson::oid::ObjectId::with_string(id)
+            .map_or_else(|e| not_found("Object ID invalid"), |s| Ok(s))?;
+
         let mut filter = Self::write_filter(&user);
         filter.insert(Self::ID, oid);
 
@@ -272,7 +316,7 @@ impl Database for Mongodb {
             .find_one_and_delete(filter, None)
             .await;
         match result {
-            Ok(Some(doc)) => Ok(doc),
+            Ok(Some(doc)) => Ok(Self::expose(doc)),
             Ok(None) => error::not_found("Object not found"),
             Err(_) => error::internal_server_error("Unexpected query error"),
         }

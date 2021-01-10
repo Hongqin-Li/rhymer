@@ -145,7 +145,7 @@ pub async fn retrieve(
                 serde_json::to_string(v)
                     .map_or_else(|_e| internal_server_error("Serialization error"), |s| Ok(s))
             } else if v.len() == 0 {
-                not_found("")
+                not_found("Object not found")
             } else {
                 internal_server_error("Id not unique")
             }
@@ -214,7 +214,7 @@ pub async fn delete(
 
 #[cfg(test)]
 mod test {
-    use std::{collections::HashMap, convert::TryFrom, sync::Arc};
+    use std::{collections::HashMap, convert::TryFrom, sync::Arc, thread::sleep, time::Duration};
 
     use mongodb::bson::Document;
     use serde_json::{json, Map, Value};
@@ -223,7 +223,7 @@ mod test {
     use super::super::tests::test_api;
 
     #[tokio::test]
-    async fn test_create() {
+    async fn test_crud() {
         let api = test_api().await;
 
         let create1 = async move |api, class, body| {
@@ -234,6 +234,32 @@ mod test {
                 .reply(api)
                 .await
         };
+
+        let retrieve1 = async move |api, class, id| {
+            warp::test::request()
+                .method("GET")
+                .path(&format!("/classes/{}/{}", class, id))
+                .reply(api)
+                .await
+        };
+
+        let update1 = async move |api, class, id, body| {
+            warp::test::request()
+                .method("PUT")
+                .path(&format!("/classes/{}/{}", class, id))
+                .json(&body)
+                .reply(api)
+                .await
+        };
+
+        let delete1 = async move |api, class, id| {
+            warp::test::request()
+                .method("DELETE")
+                .path(&format!("/classes/{}/{}", class, id))
+                .reply(api)
+                .await
+        };
+
         // Test class name validation.
         let resp = create1(&api, "_foo", json!({"a": "1"})).await;
         debug!("resp: {:?}", resp);
@@ -272,12 +298,83 @@ mod test {
         assert_eq!(a.get(2).unwrap().as_str().unwrap(), "b");
         assert_eq!(a.get(3).unwrap().as_bool().unwrap(), false);
 
+        let id = body.get_str("objectId").unwrap();
+        let created_at = body.get_str("createdAt").unwrap();
+        let updated_at = body.get_str("updatedAt").unwrap();
 
+        // Test retrieve non-exist object.
+        let resp = retrieve1(&api, "foo", "xxx").await;
+        assert_eq!(resp.status(), StatusCode::NOT_FOUND);
 
+        // Test retrieve successfully.
+        let resp = retrieve1(&api, "foo", id).await;
+        let body = Document::try_from(
+            serde_json::from_slice::<Map<String, Value>>(&resp.body()[..]).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+        assert_eq!(body.get_str("objectId").unwrap(), id);
+        assert_eq!(body.get_str("createdAt").unwrap(), created_at);
+        assert_eq!(body.get_str("updatedAt").unwrap(), updated_at);
+        assert!(body.get_i64("test-int").is_err());
+        assert_eq!(body.get_i32("test-int").unwrap(), 1);
+        assert_eq!(body.get_str("test-string").unwrap(), "a");
+        assert_eq!(body.get_bool("test-bool").unwrap(), true);
+        let a = body.get_array("test-array").unwrap();
+        assert_eq!(a.get(0).unwrap().as_i32().unwrap(), -1);
+        assert_eq!(a.get(1).unwrap().as_i64().unwrap(), 1000000000000);
+        assert_eq!(a.get(2).unwrap().as_str().unwrap(), "b");
+        assert_eq!(a.get(3).unwrap().as_bool().unwrap(), false);
+
+        // Update non-exist object.
+        let resp = update1(&api, "foo", "xxx", json!({"newField": 1})).await;
+        assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+
+        // Updates with empty data, non-empty objectId or non-empty ACL should be forbidden.
+        let resp = update1(&api, "foo", id, json!({})).await;
+        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+        let resp = update1(&api, "foo", id, json!({ "objectId": "xxx" })).await;
+        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+        let resp = update1(&api, "foo", id, json!({ "acl": "xxxx" })).await;
+        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+
+        sleep(Duration::from_secs(2)); // So that we can see the difference of updatedAt.
+
+        // Update successfully.
+        let resp = update1(&api, "foo", id, json!({"newField": 1})).await;
+        let body = Document::try_from(
+            serde_json::from_slice::<Map<String, Value>>(&resp.body()[..]).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+        assert!(body.get_i32("newField").is_err());
+        assert!(body.get("objectId").is_some());
+
+        // Retrieve the updated object with new updatedAt field.
+        let resp = retrieve1(&api, "foo", id).await;
+        let body = Document::try_from(
+            serde_json::from_slice::<Map<String, Value>>(&resp.body()[..]).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(body.get_str("createdAt").unwrap(), created_at);
+        assert_eq!(body.get_i32("newField").unwrap(), 1);
+        assert!(dbg!(body.get_str("updatedAt").unwrap()) > dbg!(updated_at));
+
+        // Test delete non-exist object.
+        let resp = delete1(&api, "foo", "xxx").await;
+        assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+
+        // Test delete successfully.
+        let resp = delete1(&api, "foo", id).await;
+        assert_eq!(resp.status(), StatusCode::OK);
     }
 
     #[tokio::test]
     async fn test_acl() {
-    }
+        // Private ACL
 
+        // Read test
+
+        // Writable.
+    }
 }

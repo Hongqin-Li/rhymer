@@ -101,10 +101,12 @@ fn with_req(
     warp::header::headers_cloned().and(warp::body::json()).map(
         move |headers: HeaderMap, body: Map<String, Value>| {
             // See https://github.com/mongodb/bson-rust/issues/189
-            let body = Document::try_from(body).map_or_else(|e| {
-                warn!("request body deserialized failed");
-                None
-            }, |d| Some(d)
+            let body = Document::try_from(body).map_or_else(
+                |e| {
+                    warn!("request body deserialized failed");
+                    None
+                },
+                |d| Some(d),
             );
             let user = parse_user(&headers, &key);
             Request {
