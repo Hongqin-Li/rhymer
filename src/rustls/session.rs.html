@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source to the Rust file `/home/runner/.cargo/registry/src/github.com-1ecc6299db9ec823/rustls-0.18.1/src/session.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>session.rs.html -- source</title><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../light.css"  id="themeStyle"><link rel="stylesheet" type="text/css" href="../../dark.css" disabled ><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled ><script src="../../storage.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="icon" type="image/svg+xml" href="../../favicon.svg">
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source to the Rust file `/home/runner/.cargo/registry/src/github.com-1ecc6299db9ec823/rustls-0.17.0/src/session.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>session.rs.html -- source</title><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../light.css"  id="themeStyle"><link rel="stylesheet" type="text/css" href="../../dark.css" disabled ><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled ><script src="../../storage.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="icon" type="image/svg+xml" href="../../favicon.svg">
 <link rel="alternate icon" type="image/png" href="../../favicon-16x16.png">
 <link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><style type="text/css">#crate-search{background-image:url("../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu">&#9776;</div><a href='../../rustls/index.html'><div class='logo-container rust-logo'><img src='../../rust-logo.png' alt='logo'></div></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!"><img src="../../brush.svg" width="18" alt="Pick another theme!"></button><div id="theme-choices"></div></div><script src="../../theme.js"></script><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><span class="help-button">?</span>
                 <a id="settings-menu" href="../../settings.html"><img src="../../wheel.svg" width="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><pre class="line-numbers"><span id="1">  1</span>
@@ -759,46 +759,6 @@
 <span id="756">756</span>
 <span id="757">757</span>
 <span id="758">758</span>
-<span id="759">759</span>
-<span id="760">760</span>
-<span id="761">761</span>
-<span id="762">762</span>
-<span id="763">763</span>
-<span id="764">764</span>
-<span id="765">765</span>
-<span id="766">766</span>
-<span id="767">767</span>
-<span id="768">768</span>
-<span id="769">769</span>
-<span id="770">770</span>
-<span id="771">771</span>
-<span id="772">772</span>
-<span id="773">773</span>
-<span id="774">774</span>
-<span id="775">775</span>
-<span id="776">776</span>
-<span id="777">777</span>
-<span id="778">778</span>
-<span id="779">779</span>
-<span id="780">780</span>
-<span id="781">781</span>
-<span id="782">782</span>
-<span id="783">783</span>
-<span id="784">784</span>
-<span id="785">785</span>
-<span id="786">786</span>
-<span id="787">787</span>
-<span id="788">788</span>
-<span id="789">789</span>
-<span id="790">790</span>
-<span id="791">791</span>
-<span id="792">792</span>
-<span id="793">793</span>
-<span id="794">794</span>
-<span id="795">795</span>
-<span id="796">796</span>
-<span id="797">797</span>
-<span id="798">798</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="ident">ring</span>;
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">io</span>::{<span class="ident">Read</span>, <span class="ident">Write</span>};
@@ -812,7 +772,7 @@
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">error</span>::<span class="ident">TLSError</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">suites</span>::<span class="ident">SupportedCipherSuite</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">cipher</span>;
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">vecbuf</span>::<span class="ident">ChunkVecBuffer</span>;
+<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">vecbuf</span>::{<span class="ident">ChunkVecBuffer</span>, <span class="ident">WriteV</span>};
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">key</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">prf</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">rand</span>;
@@ -853,6 +813,11 @@
     <span class="doccomment">///</span>
     <span class="doccomment">/// [`wants_write`]: #tymethod.wants_write</span>
     <span class="kw">fn</span> <span class="ident">write_tls</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">wr</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">dyn</span> <span class="ident">Write</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">usize</span>, <span class="ident">io</span>::<span class="ident">Error</span><span class="op">&gt;</span>;
+
+    <span class="doccomment">/// Like `write_tls`, but writes potentially many records in one</span>
+    <span class="doccomment">/// go via `wr`; a `rustls::WriteV`.  This function has the same semantics</span>
+    <span class="doccomment">/// as `write_tls` otherwise.</span>
+    <span class="kw">fn</span> <span class="ident">writev_tls</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">wr</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">dyn</span> <span class="ident">WriteV</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">usize</span>, <span class="ident">io</span>::<span class="ident">Error</span><span class="op">&gt;</span>;
 
     <span class="doccomment">/// Processes any new packets read by a previous call to `read_tls`.</span>
     <span class="doccomment">/// Errors from this function relate to TLS protocol errors, and</span>
@@ -1192,16 +1157,6 @@
     <span class="ident">No</span>
 }
 
-<span class="doccomment">/// For TLS1.3 middlebox compatibility mode, how to handle</span>
-<span class="doccomment">/// a received ChangeCipherSpec message.</span>
-<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">MiddleboxCCS</span> {
-    <span class="doccomment">/// process the message as normal</span>
-    <span class="ident">Process</span>,
-
-    <span class="doccomment">/// just ignore it</span>
-    <span class="ident">Drop</span>,
-}
-
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">SessionCommon</span> {
     <span class="kw">pub</span> <span class="ident">negotiated_version</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">ProtocolVersion</span><span class="op">&gt;</span>,
     <span class="kw">pub</span> <span class="ident">is_client</span>: <span class="ident">bool</span>,
@@ -1210,8 +1165,6 @@
     <span class="ident">peer_eof</span>: <span class="ident">bool</span>,
     <span class="kw">pub</span> <span class="ident">traffic</span>: <span class="ident">bool</span>,
     <span class="kw">pub</span> <span class="ident">early_traffic</span>: <span class="ident">bool</span>,
-    <span class="ident">sent_fatal_alert</span>: <span class="ident">bool</span>,
-    <span class="ident">received_middlebox_ccs</span>: <span class="ident">bool</span>,
     <span class="kw">pub</span> <span class="ident">message_deframer</span>: <span class="ident">MessageDeframer</span>,
     <span class="kw">pub</span> <span class="ident">handshake_joiner</span>: <span class="ident">HandshakeJoiner</span>,
     <span class="kw">pub</span> <span class="ident">message_fragmenter</span>: <span class="ident">MessageFragmenter</span>,
@@ -1234,8 +1187,6 @@
             <span class="ident">peer_eof</span>: <span class="bool-val">false</span>,
             <span class="ident">traffic</span>: <span class="bool-val">false</span>,
             <span class="ident">early_traffic</span>: <span class="bool-val">false</span>,
-            <span class="ident">sent_fatal_alert</span>: <span class="bool-val">false</span>,
-            <span class="ident">received_middlebox_ccs</span>: <span class="bool-val">false</span>,
             <span class="ident">message_deframer</span>: <span class="ident">MessageDeframer</span>::<span class="ident">new</span>(),
             <span class="ident">handshake_joiner</span>: <span class="ident">HandshakeJoiner</span>::<span class="ident">new</span>(),
             <span class="ident">message_fragmenter</span>: <span class="ident">MessageFragmenter</span>::<span class="ident">new</span>(<span class="ident">mtu</span>.<span class="ident">unwrap_or</span>(<span class="ident">MAX_FRAGMENT_LEN</span>)),
@@ -1277,26 +1228,6 @@
         }
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">filter_tls13_ccs</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">msg</span>: <span class="kw-2">&amp;</span><span class="ident">Message</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">MiddleboxCCS</span>, <span class="ident">TLSError</span><span class="op">&gt;</span> {
-        <span class="comment">// pass message to handshake state machine if any of these are true:</span>
-        <span class="comment">// - TLS1.2 (where it&#39;s part of the state machine),</span>
-        <span class="comment">// - prior to determining the version (it&#39;s illegal as a first message)</span>
-        <span class="comment">// - if it&#39;s not a CCS at all</span>
-        <span class="comment">// - if we&#39;ve finished the handshake</span>
-        <span class="kw">if</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">is_tls13</span>() <span class="op">|</span><span class="op">|</span>
-           <span class="op">!</span><span class="ident">msg</span>.<span class="ident">is_content_type</span>(<span class="ident">ContentType</span>::<span class="ident">ChangeCipherSpec</span>) <span class="op">|</span><span class="op">|</span>
-           <span class="self">self</span>.<span class="ident">traffic</span> {
-            <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="ident">MiddleboxCCS</span>::<span class="ident">Process</span>);
-        }
-
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">received_middlebox_ccs</span> {
-            <span class="prelude-val">Err</span>(<span class="ident">TLSError</span>::<span class="ident">PeerMisbehavedError</span>(<span class="string">&quot;illegal middlebox CCS received&quot;</span>.<span class="ident">into</span>()))
-        } <span class="kw">else</span> {
-            <span class="self">self</span>.<span class="ident">received_middlebox_ccs</span> <span class="op">=</span> <span class="bool-val">true</span>;
-            <span class="prelude-val">Ok</span>(<span class="ident">MiddleboxCCS</span>::<span class="ident">Drop</span>)
-        }
-    }
-
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">decrypt_incoming</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">encr</span>: <span class="ident">Message</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Message</span>, <span class="ident">TLSError</span><span class="op">&gt;</span> {
         <span class="kw">if</span> <span class="self">self</span>.<span class="ident">record_layer</span>.<span class="ident">wants_close_before_decrypt</span>() {
             <span class="self">self</span>.<span class="ident">send_close_notify</span>();
@@ -1332,10 +1263,9 @@
                 <span class="kw">return</span> <span class="prelude-val">Ok</span>(());
             }
 
-            <span class="comment">// Warnings are nonfatal for TLS1.2, but outlawed in TLS1.3</span>
-            <span class="comment">// (except, for no good reason, user_cancelled).</span>
+            <span class="comment">// Warnings are nonfatal for TLS1.2, but outlawed in TLS1.3.</span>
             <span class="kw">if</span> <span class="ident">alert</span>.<span class="ident">level</span> <span class="op">=</span><span class="op">=</span> <span class="ident">AlertLevel</span>::<span class="ident">Warning</span> {
-                <span class="kw">if</span> <span class="self">self</span>.<span class="ident">is_tls13</span>() <span class="op">&amp;&amp;</span> <span class="ident">alert</span>.<span class="ident">description</span> <span class="op">!</span><span class="op">=</span> <span class="ident">AlertDescription</span>::<span class="ident">UserCanceled</span> {
+                <span class="kw">if</span> <span class="self">self</span>.<span class="ident">is_tls13</span>() {
                     <span class="self">self</span>.<span class="ident">send_fatal_alert</span>(<span class="ident">AlertDescription</span>::<span class="ident">DecodeError</span>);
                 } <span class="kw">else</span> {
                     <span class="macro">warn</span><span class="macro">!</span>(<span class="string">&quot;TLS alert warning received: {:#?}&quot;</span>, <span class="ident">msg</span>);
@@ -1420,6 +1350,10 @@
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">write_tls</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">wr</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">dyn</span> <span class="ident">Write</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">io</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span> {
         <span class="self">self</span>.<span class="ident">sendable_tls</span>.<span class="ident">write_to</span>(<span class="ident">wr</span>)
+    }
+
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">writev_tls</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">wr</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">dyn</span> <span class="ident">WriteV</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">io</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span> {
+        <span class="self">self</span>.<span class="ident">sendable_tls</span>.<span class="ident">writev_to</span>(<span class="ident">wr</span>)
     }
 
     <span class="doccomment">/// Send plaintext application data, fragmenting and</span>
@@ -1544,10 +1478,8 @@
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">send_fatal_alert</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">desc</span>: <span class="ident">AlertDescription</span>) {
         <span class="macro">warn</span><span class="macro">!</span>(<span class="string">&quot;Sending fatal alert {:?}&quot;</span>, <span class="ident">desc</span>);
-        <span class="macro">debug_assert</span><span class="macro">!</span>(<span class="op">!</span><span class="self">self</span>.<span class="ident">sent_fatal_alert</span>);
         <span class="kw">let</span> <span class="ident">m</span> <span class="op">=</span> <span class="ident">Message</span>::<span class="ident">build_alert</span>(<span class="ident">AlertLevel</span>::<span class="ident">Fatal</span>, <span class="ident">desc</span>);
         <span class="self">self</span>.<span class="ident">send_msg</span>(<span class="ident">m</span>, <span class="self">self</span>.<span class="ident">record_layer</span>.<span class="ident">is_encrypting</span>());
-        <span class="self">self</span>.<span class="ident">sent_fatal_alert</span> <span class="op">=</span> <span class="bool-val">true</span>;
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">send_close_notify</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) {
@@ -1558,15 +1490,6 @@
     <span class="kw">fn</span> <span class="ident">send_warning_alert_no_log</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">desc</span>: <span class="ident">AlertDescription</span>) {
         <span class="kw">let</span> <span class="ident">m</span> <span class="op">=</span> <span class="ident">Message</span>::<span class="ident">build_alert</span>(<span class="ident">AlertLevel</span>::<span class="ident">Warning</span>, <span class="ident">desc</span>);
         <span class="self">self</span>.<span class="ident">send_msg</span>(<span class="ident">m</span>, <span class="self">self</span>.<span class="ident">record_layer</span>.<span class="ident">is_encrypting</span>());
-    }
-
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_quic</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
-        <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;quic&quot;</span>)]</span>
-        {
-            <span class="self">self</span>.<span class="ident">protocol</span> <span class="op">=</span><span class="op">=</span> <span class="ident">Protocol</span>::<span class="ident">Quic</span>
-        }
-        <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;quic&quot;</span>))]</span>
-        <span class="bool-val">false</span>
     }
 }
 
@@ -1580,8 +1503,6 @@
     <span class="kw">pub</span> <span class="ident">early_secret</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">ring</span>::<span class="ident">hkdf</span>::<span class="ident">Prk</span><span class="op">&gt;</span>,
     <span class="kw">pub</span> <span class="ident">hs_secrets</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">quic</span>::<span class="ident">Secrets</span><span class="op">&gt;</span>,
     <span class="kw">pub</span> <span class="ident">traffic_secrets</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">quic</span>::<span class="ident">Secrets</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// Whether keys derived from traffic_secrets have been passed to the QUIC implementation</span>
-    <span class="kw">pub</span> <span class="ident">returned_traffic_keys</span>: <span class="ident">bool</span>,
 }
 
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;quic&quot;</span>)]</span>
@@ -1594,7 +1515,6 @@
             <span class="ident">early_secret</span>: <span class="prelude-val">None</span>,
             <span class="ident">hs_secrets</span>: <span class="prelude-val">None</span>,
             <span class="ident">traffic_secrets</span>: <span class="prelude-val">None</span>,
-            <span class="ident">returned_traffic_keys</span>: <span class="bool-val">false</span>,
         }
     }
 }
