@@ -15,7 +15,7 @@ pub type HookFunc = Box<
 >;
 pub type Function = Box<
     fn(
-        &mut Request,
+        Request,
         Arc<Context>,
         HashMap<String, String>,
     ) -> Pin<Box<dyn Future<Output = Result<String, Rejection>> + Send + 'static>>,
@@ -26,12 +26,12 @@ pub type FuncMap = HashMap<String, Function>;
 pub async fn run(
     name: String,
     arg: HashMap<String, String>,
-    mut req: Request,
+    req: Request,
     ctx: Arc<Context>,
 ) -> Result<impl Reply, Rejection> {
     if let Some(f) = ctx.function.get(&name) {
         trace!("run function '{}', args {:?}", name, arg.clone());
-        f(&mut req, ctx.clone(), arg).await
+        f(req, ctx.clone(), arg).await
     } else {
         not_found(format!("function '{}' not found", name))
     }
@@ -39,13 +39,22 @@ pub async fn run(
 
 #[cfg(test)]
 mod test {
-    use std::{collections::HashMap, convert::TryFrom, sync::{Arc, Mutex}, thread::sleep, time::Duration};
+    use std::{
+        collections::HashMap,
+        convert::TryFrom,
+        sync::{Arc, Mutex},
+        thread::sleep,
+        time::Duration,
+    };
 
     use mongodb::bson::Document;
     use serde_json::{json, Map, Value};
     use warp::{hyper::StatusCode, Rejection};
 
-    use crate::{error::bad_request, server::{Context, Request}};
+    use crate::{
+        error::bad_request,
+        server::{Context, Request},
+    };
 
     use super::super::tests::{test_api, test_server};
     use lazy_static::lazy_static;
@@ -62,7 +71,6 @@ mod test {
         *CNT.lock().unwrap() -= 1;
         Ok(req)
     }
-    
 
     async fn test_err(req: Request, ctx: Arc<Context>) -> Result<Request, Rejection> {
         bad_request("test err")
@@ -85,7 +93,6 @@ mod test {
                 .reply(api)
                 .await
         };
-
 
         // let retrieve1 = async move |api, class, id| {
         //     warp::test::request()
@@ -140,7 +147,7 @@ mod test {
         let resp = create1(&api, "foo", json!({"name": "a"})).await;
         assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
         *CNT.lock().unwrap() -= 1;
-        assert_eq!(*CNT.lock().unwrap(), ids.len() as i32);     
+        assert_eq!(*CNT.lock().unwrap(), ids.len() as i32);
 
         // Test before/after destroy.
         s.before_destroy("foo", Box::new(|req, ctx| Box::pin(dec(req, ctx))));
@@ -152,6 +159,37 @@ mod test {
             assert_eq!(resp.status(), StatusCode::OK);
         }
         assert_eq!(*CNT.lock().unwrap(), -(ids.len() as i32));
+    }
 
+    async fn test_f(
+        req: Request,
+        ctx: Arc<Context>,
+        arg: HashMap<String, String>,
+    ) -> Result<String, Rejection> {
+        Ok(arg.get("bar").map_or("none".to_string(), |s| s.to_owned()))
+    }
+
+    #[tokio::test]
+    async fn test_func() {
+        let mut s = test_server().await;
+        s.define(
+            "foo",
+            Box::new(|req, ctx, arg| Box::pin(test_f(req, ctx, arg))),
+        );
+
+        let api = s.routes().await;
+
+        let invoke1 = async move |api, name, query| {
+            warp::test::request()
+                .method("GET")
+                .path(&format!("/functions/{}?{}", name, query))
+                .reply(api)
+                .await
+        };
+        let resp = invoke1(&api, "xxx", "").await;
+        assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+        let resp = invoke1(&api, "foo", "a=1&bar=2").await;
+        assert_eq!(resp.status(), StatusCode::OK);
+        assert_eq!(String::from_utf8(resp.body()[..].to_vec()).unwrap(), "2");
     }
 }

@@ -9,8 +9,8 @@ API server module in Rust
 - [x] (Tested) Object
 - [x] Access control
 - [x] (Tested) Hook(before/after save, before/after destroy)
-- [x] Function
-- [x] Github CI and github page with cargo doc
+- [x] (Tested) Function
+- [x] Github CI with `cargo test` and Github page with `cargo doc`
 - [ ] User email
 
 ## Usage
