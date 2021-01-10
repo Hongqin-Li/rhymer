@@ -381,6 +381,30 @@
 <span id="378">378</span>
 <span id="379">379</span>
 <span id="380">380</span>
+<span id="381">381</span>
+<span id="382">382</span>
+<span id="383">383</span>
+<span id="384">384</span>
+<span id="385">385</span>
+<span id="386">386</span>
+<span id="387">387</span>
+<span id="388">388</span>
+<span id="389">389</span>
+<span id="390">390</span>
+<span id="391">391</span>
+<span id="392">392</span>
+<span id="393">393</span>
+<span id="394">394</span>
+<span id="395">395</span>
+<span id="396">396</span>
+<span id="397">397</span>
+<span id="398">398</span>
+<span id="399">399</span>
+<span id="400">400</span>
+<span id="401">401</span>
+<span id="402">402</span>
+<span id="403">403</span>
+<span id="404">404</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="kw">crate</span>::{
     <span class="ident">acl</span>::<span class="ident">Acl</span>,
@@ -426,22 +450,36 @@
         <span class="self">self</span>.<span class="ident">doc</span> <span class="op">=</span> <span class="ident">doc</span>;
     }
 
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">set_acl</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">acl</span>: <span class="ident">Acl</span>) {
+        <span class="self">self</span>.<span class="ident">acl</span> <span class="op">=</span> <span class="ident">acl</span>;
+    }
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_acl</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Acl</span> {
         <span class="self">self</span>.<span class="ident">acl</span>.<span class="ident">clone</span>()
     }
 
     <span class="doccomment">/// Update if id is provided, else create a new one.</span>
     <span class="kw">pub</span> <span class="ident">async</span> <span class="kw">fn</span> <span class="ident">save</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Document</span>, <span class="ident">Rejection</span><span class="op">&gt;</span> {
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">doc</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">doc</span>.<span class="ident">clone</span>();
+
+        <span class="kw">match</span> <span class="self">self</span>.<span class="ident">user</span> {
+            <span class="comment">// Only Master can modify ACL.</span>
+            <span class="ident">UserKind</span>::<span class="ident">Master</span> <span class="op">=</span><span class="op">&gt;</span> {
+                <span class="kw">let</span> <span class="ident">acl_doc</span>: <span class="ident">Document</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">acl</span>.<span class="ident">clone</span>().<span class="ident">into</span>();
+                <span class="ident">doc</span>.<span class="ident">insert</span>(<span class="ident">database</span>::<span class="ident">ACL</span>, <span class="ident">acl_doc</span>);
+            }
+            <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> {}
+        };
+
         <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">id</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">id</span>.<span class="ident">clone</span>() {
             (<span class="kw-2">*</span><span class="self">self</span>.<span class="ident">ctx</span>)
                 .<span class="ident">db</span>
-                .<span class="ident">update</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">class</span>, <span class="kw-2">&amp;</span><span class="ident">id</span>, <span class="self">self</span>.<span class="ident">doc</span>.<span class="ident">clone</span>(), <span class="self">self</span>.<span class="ident">user</span>.<span class="ident">clone</span>())
+                .<span class="ident">update</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">class</span>, <span class="kw-2">&amp;</span><span class="ident">id</span>, <span class="ident">doc</span>, <span class="self">self</span>.<span class="ident">user</span>.<span class="ident">clone</span>())
                 .<span class="ident">await</span>
         <span class="comment">// Database guarantees the invariance of id, thus no need to update self.id</span>
         } <span class="kw">else</span> {
             (<span class="kw-2">*</span><span class="self">self</span>.<span class="ident">ctx</span>)
                 .<span class="ident">db</span>
-                .<span class="ident">create</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">class</span>, <span class="self">self</span>.<span class="ident">doc</span>.<span class="ident">clone</span>(), <span class="self">self</span>.<span class="ident">user</span>.<span class="ident">clone</span>())
+                .<span class="ident">create</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">class</span>, <span class="ident">doc</span>, <span class="self">self</span>.<span class="ident">user</span>.<span class="ident">clone</span>())
                 .<span class="ident">await</span>
                 .<span class="ident">map</span>(<span class="op">|</span><span class="ident">d</span><span class="op">|</span> {
                     <span class="kw">let</span> <span class="ident">id</span> <span class="op">=</span> <span class="ident">d</span>
@@ -477,7 +515,7 @@
     <span class="kw">let</span> <span class="ident">class</span> <span class="op">=</span> <span class="ident">class</span>.<span class="ident">as_str</span>();
     <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">f</span>) <span class="op">=</span> <span class="ident">ctx</span>.<span class="ident">before_save</span>.<span class="ident">get</span>(<span class="ident">class</span>) {
         <span class="macro">trace</span><span class="macro">!</span>(<span class="string">&quot;before save(create): {}&quot;</span>, <span class="ident">class</span>);
-        <span class="ident">f</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">req</span>, <span class="ident">ctx</span>.<span class="ident">clone</span>()).<span class="ident">await</span><span class="question-mark">?</span>;
+        <span class="ident">req</span> <span class="op">=</span> <span class="ident">f</span>(<span class="ident">req</span>, <span class="ident">ctx</span>.<span class="ident">clone</span>()).<span class="ident">await</span><span class="question-mark">?</span>;
     };
     <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="kw-2">ref</span> <span class="ident">body</span>) <span class="op">=</span> <span class="ident">req</span>.<span class="ident">body</span> {
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">obj</span> <span class="op">=</span> <span class="ident">Object</span>::<span class="ident">from</span>(<span class="ident">ctx</span>.<span class="ident">clone</span>(), <span class="ident">req</span>.<span class="ident">user</span>.<span class="ident">clone</span>());
@@ -490,7 +528,7 @@
         })<span class="question-mark">?</span>;
         <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">f</span>) <span class="op">=</span> <span class="ident">ctx</span>.<span class="ident">after_save</span>.<span class="ident">get</span>(<span class="ident">class</span>) {
             <span class="macro">trace</span><span class="macro">!</span>(<span class="string">&quot;after save(create): {}&quot;</span>, <span class="ident">class</span>);
-            <span class="ident">f</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">req</span>, <span class="ident">ctx</span>.<span class="ident">clone</span>()).<span class="ident">await</span><span class="question-mark">?</span>;
+            <span class="ident">req</span> <span class="op">=</span> <span class="ident">f</span>(<span class="ident">req</span>, <span class="ident">ctx</span>.<span class="ident">clone</span>()).<span class="ident">await</span><span class="question-mark">?</span>;
         };
         <span class="prelude-val">Ok</span>(<span class="ident">warp</span>::<span class="ident">reply</span>::<span class="ident">with_status</span>(
             <span class="ident">result</span>,
@@ -501,6 +539,7 @@
     }
 }
 
+<span class="doccomment">/// TODO: Query instead of directly query db.</span>
 <span class="kw">pub</span> <span class="ident">async</span> <span class="kw">fn</span> <span class="ident">retrieve_by_filter</span>(
     <span class="ident">class</span>: <span class="ident">ClassName</span>,
     <span class="ident">filter</span>: <span class="ident">Document</span>,
@@ -514,6 +553,7 @@
     })
 }
 
+<span class="doccomment">/// TODO: use Query instead of directly query db.</span>
 <span class="kw">pub</span> <span class="ident">async</span> <span class="kw">fn</span> <span class="ident">retrieve</span>(
     <span class="ident">class</span>: <span class="ident">ClassName</span>,
     <span class="ident">id</span>: <span class="ident">String</span>,
@@ -546,7 +586,7 @@
     <span class="kw">let</span> <span class="ident">class</span> <span class="op">=</span> <span class="ident">class</span>.<span class="ident">as_str</span>();
     <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">f</span>) <span class="op">=</span> <span class="ident">ctx</span>.<span class="ident">before_save</span>.<span class="ident">get</span>(<span class="ident">class</span>) {
         <span class="macro">trace</span><span class="macro">!</span>(<span class="string">&quot;before save(update): {}&quot;</span>, <span class="ident">class</span>);
-        <span class="ident">f</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">req</span>, <span class="ident">ctx</span>.<span class="ident">clone</span>()).<span class="ident">await</span><span class="question-mark">?</span>;
+        <span class="ident">req</span> <span class="op">=</span> <span class="ident">f</span>(<span class="ident">req</span>, <span class="ident">ctx</span>.<span class="ident">clone</span>()).<span class="ident">await</span><span class="question-mark">?</span>;
     };
     <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="kw-2">ref</span> <span class="ident">body</span>) <span class="op">=</span> <span class="ident">req</span>.<span class="ident">body</span> {
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">obj</span> <span class="op">=</span> <span class="ident">Object</span>::<span class="ident">from</span>(<span class="ident">ctx</span>.<span class="ident">clone</span>(), <span class="ident">req</span>.<span class="ident">user</span>.<span class="ident">clone</span>());
@@ -561,7 +601,7 @@
 
         <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">f</span>) <span class="op">=</span> <span class="ident">ctx</span>.<span class="ident">after_save</span>.<span class="ident">get</span>(<span class="ident">class</span>) {
             <span class="macro">trace</span><span class="macro">!</span>(<span class="string">&quot;after save(update): {}&quot;</span>, <span class="ident">class</span>);
-            <span class="ident">f</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">req</span>, <span class="ident">ctx</span>.<span class="ident">clone</span>()).<span class="ident">await</span><span class="question-mark">?</span>;
+            <span class="ident">req</span> <span class="op">=</span> <span class="ident">f</span>(<span class="ident">req</span>, <span class="ident">ctx</span>.<span class="ident">clone</span>()).<span class="ident">await</span><span class="question-mark">?</span>;
         };
         <span class="prelude-val">Ok</span>(<span class="ident">result</span>)
     } <span class="kw">else</span> {
@@ -578,7 +618,7 @@
     <span class="kw">let</span> <span class="ident">class</span> <span class="op">=</span> <span class="ident">class</span>.<span class="ident">as_str</span>();
     <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">f</span>) <span class="op">=</span> <span class="ident">ctx</span>.<span class="ident">before_destroy</span>.<span class="ident">get</span>(<span class="ident">class</span>) {
         <span class="macro">trace</span><span class="macro">!</span>(<span class="string">&quot;before destroy: {}&quot;</span>, <span class="ident">class</span>);
-        <span class="ident">f</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">req</span>, <span class="ident">ctx</span>.<span class="ident">clone</span>()).<span class="ident">await</span><span class="question-mark">?</span>;
+        <span class="ident">req</span> <span class="op">=</span> <span class="ident">f</span>(<span class="ident">req</span>, <span class="ident">ctx</span>.<span class="ident">clone</span>()).<span class="ident">await</span><span class="question-mark">?</span>;
     };
 
     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">obj</span> <span class="op">=</span> <span class="ident">Object</span>::<span class="ident">from</span>(<span class="ident">ctx</span>.<span class="ident">clone</span>(), <span class="ident">req</span>.<span class="ident">user</span>.<span class="ident">clone</span>());
@@ -591,7 +631,7 @@
 
     <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">f</span>) <span class="op">=</span> <span class="ident">ctx</span>.<span class="ident">after_destroy</span>.<span class="ident">get</span>(<span class="ident">class</span>) {
         <span class="macro">trace</span><span class="macro">!</span>(<span class="string">&quot;after destroy: {}&quot;</span>, <span class="ident">class</span>);
-        <span class="ident">f</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">req</span>, <span class="ident">ctx</span>.<span class="ident">clone</span>()).<span class="ident">await</span><span class="question-mark">?</span>;
+        <span class="ident">req</span> <span class="op">=</span> <span class="ident">f</span>(<span class="ident">req</span>, <span class="ident">ctx</span>.<span class="ident">clone</span>()).<span class="ident">await</span><span class="question-mark">?</span>;
     };
     <span class="prelude-val">Ok</span>(<span class="ident">result</span>)
 }
@@ -604,7 +644,7 @@
     <span class="kw">use</span> <span class="ident">serde_json</span>::{<span class="ident">json</span>, <span class="ident">Map</span>, <span class="ident">Value</span>};
     <span class="kw">use</span> <span class="ident">warp</span>::<span class="ident">hyper</span>::<span class="ident">StatusCode</span>;
 
-    <span class="kw">use</span> <span class="kw">super</span>::<span class="kw">super</span>::<span class="ident">tests</span>::<span class="ident">test_api</span>;
+    <span class="kw">use</span> <span class="kw">super</span>::<span class="kw">super</span>::<span class="ident">tests</span>::{<span class="ident">test_api</span>, <span class="ident">test_server</span>};
 
     <span class="attribute">#[<span class="ident">tokio</span>::<span class="ident">test</span>]</span>
     <span class="ident">async</span> <span class="kw">fn</span> <span class="ident">test_crud</span>() {
@@ -753,8 +793,16 @@
         <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">resp</span>.<span class="ident">status</span>(), <span class="ident">StatusCode</span>::<span class="ident">OK</span>);
     }
 
+    <span class="ident">async</span> <span class="kw">fn</span> <span class="ident">test</span>(<span class="ident">a</span>: <span class="ident">i32</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">i32</span> {
+        <span class="number">1</span>
+    }
+
     <span class="attribute">#[<span class="ident">tokio</span>::<span class="ident">test</span>]</span>
     <span class="ident">async</span> <span class="kw">fn</span> <span class="ident">test_acl</span>() {
+        <span class="kw">let</span> <span class="ident">s</span> <span class="op">=</span> <span class="ident">test_server</span>().<span class="ident">await</span>;
+        <span class="comment">// let x = test;</span>
+        <span class="comment">// s.before_save(&quot;test&quot;, x)</span>
+
         <span class="comment">// Private ACL</span>
 
         <span class="comment">// Read test</span>
