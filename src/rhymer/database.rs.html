@@ -281,9 +281,53 @@
 <span id="278">278</span>
 <span id="279">279</span>
 <span id="280">280</span>
+<span id="281">281</span>
+<span id="282">282</span>
+<span id="283">283</span>
+<span id="284">284</span>
+<span id="285">285</span>
+<span id="286">286</span>
+<span id="287">287</span>
+<span id="288">288</span>
+<span id="289">289</span>
+<span id="290">290</span>
+<span id="291">291</span>
+<span id="292">292</span>
+<span id="293">293</span>
+<span id="294">294</span>
+<span id="295">295</span>
+<span id="296">296</span>
+<span id="297">297</span>
+<span id="298">298</span>
+<span id="299">299</span>
+<span id="300">300</span>
+<span id="301">301</span>
+<span id="302">302</span>
+<span id="303">303</span>
+<span id="304">304</span>
+<span id="305">305</span>
+<span id="306">306</span>
+<span id="307">307</span>
+<span id="308">308</span>
+<span id="309">309</span>
+<span id="310">310</span>
+<span id="311">311</span>
+<span id="312">312</span>
+<span id="313">313</span>
+<span id="314">314</span>
+<span id="315">315</span>
+<span id="316">316</span>
+<span id="317">317</span>
+<span id="318">318</span>
+<span id="319">319</span>
+<span id="320">320</span>
+<span id="321">321</span>
+<span id="322">322</span>
+<span id="323">323</span>
+<span id="324">324</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="kw">crate</span>::{
-    <span class="ident">error</span>::{<span class="self">self</span>, <span class="ident">internal_server_error</span>},
+    <span class="ident">error</span>::{<span class="self">self</span>, <span class="ident">bad_request</span>, <span class="ident">internal_server_error</span>, <span class="ident">not_found</span>},
     <span class="ident">user</span>::<span class="ident">UserKind</span>,
 };
 <span class="kw">use</span> <span class="ident">chrono</span>::<span class="ident">Utc</span>;
@@ -362,6 +406,27 @@
             <span class="ident">doc</span>.<span class="ident">insert</span>(<span class="ident">UPDATED_AT</span>, <span class="ident">t</span>);
         }
         <span class="ident">doc</span>
+    }
+
+    <span class="comment">// FIXME: dfs</span>
+    <span class="doccomment">/// Convert `objectId` field to `_id`</span>
+    <span class="kw">fn</span> <span class="ident">inner_filter</span>(<span class="kw-2">mut</span> <span class="ident">filter</span>: <span class="ident">Document</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Document</span>, <span class="ident">Rejection</span><span class="op">&gt;</span> {
+        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">v</span>) <span class="op">=</span> <span class="ident">filter</span>.<span class="ident">remove</span>(<span class="ident">OBJECT_ID</span>) {
+            <span class="kw">match</span> <span class="ident">v</span>.<span class="ident">as_str</span>() {
+                <span class="prelude-val">None</span> <span class="op">=</span><span class="op">&gt;</span> <span class="kw">return</span> <span class="ident">bad_request</span>(<span class="string">&quot;Unexpected non-string objectId field&quot;</span>),
+                <span class="prelude-val">Some</span>(<span class="ident">id</span>) <span class="op">=</span><span class="op">&gt;</span> {
+                    <span class="kw">match</span> <span class="ident">mongodb</span>::<span class="ident">bson</span>::<span class="ident">oid</span>::<span class="ident">ObjectId</span>::<span class="ident">with_string</span>(<span class="ident">id</span>) {
+                        <span class="prelude-val">Ok</span>(<span class="ident">oid</span>) <span class="op">=</span><span class="op">&gt;</span> {
+                            <span class="ident">filter</span>.<span class="ident">insert</span>(<span class="self">Self</span>::<span class="ident">ID</span>, <span class="ident">oid</span>);
+                        }
+                        <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span><span class="op">&gt;</span> {
+                            <span class="kw">return</span> <span class="ident">not_found</span>(<span class="string">&quot;Object not found&quot;</span>);
+                        }
+                    };
+                }
+            };
+        }
+        <span class="prelude-val">Ok</span>(<span class="ident">filter</span>)
     }
 
     <span class="doccomment">/// Read filter for certain user in MongoDB</span>
@@ -481,6 +546,8 @@
         <span class="ident">filter</span>: <span class="ident">Document</span>,
         <span class="ident">user</span>: <span class="ident">UserKind</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Document</span><span class="op">&gt;</span>, <span class="ident">Rejection</span><span class="op">&gt;</span> {
+        <span class="kw">let</span> <span class="ident">filter</span> <span class="op">=</span> <span class="self">Self</span>::<span class="ident">inner_filter</span>(<span class="ident">filter</span>)<span class="question-mark">?</span>;
+
         <span class="kw">let</span> <span class="ident">filter</span> <span class="op">=</span> <span class="macro">doc</span><span class="macro">!</span>[<span class="string">&quot;$and&quot;</span>: <span class="macro">vec</span><span class="macro">!</span>[<span class="ident">filter</span>, <span class="self">Self</span>::<span class="ident">read_filter</span>(<span class="kw-2">&amp;</span><span class="ident">user</span>)]];
         <span class="macro">trace</span><span class="macro">!</span>(<span class="string">&quot;retrieve {:?} with filter {:?}&quot;</span>, <span class="ident">class</span>, <span class="ident">filter</span>);
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">cursor</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">db</span>.<span class="ident">collection</span>(<span class="ident">class</span>).<span class="ident">find</span>(<span class="ident">filter</span>, <span class="prelude-val">None</span>).<span class="ident">await</span>.<span class="ident">unwrap</span>();
@@ -497,7 +564,7 @@
         <span class="prelude-val">Ok</span>(<span class="ident">docs</span>)
     }
 
-    <span class="doccomment">/// Update a document in specific class with id by user.</span>
+    <span class="doccomment">/// Update a document in specific class with id by user and return the document before updating.</span>
     <span class="doccomment">///</span>
     <span class="doccomment">/// Master user can update with document of any content,</span>
     <span class="doccomment">/// while others updating `objectId` and `acl` field will be rejected.</span>
@@ -508,21 +575,33 @@
         <span class="kw-2">mut</span> <span class="ident">doc</span>: <span class="ident">Document</span>,
         <span class="ident">user</span>: <span class="ident">UserKind</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Document</span>, <span class="ident">Rejection</span><span class="op">&gt;</span> {
+        <span class="kw">let</span> <span class="ident">req_doc</span> <span class="op">=</span> <span class="ident">doc</span>.<span class="ident">clone</span>();
         <span class="kw">match</span> <span class="ident">user</span> {
             <span class="ident">UserKind</span>::<span class="ident">Master</span> <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="comment">// Master can update with any document</span>
             }
             <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> {
-                <span class="comment">// Client and Guest cannot update ACL</span>
-                <span class="ident">doc</span>.<span class="ident">remove</span>(<span class="ident">ACL</span>);
+                <span class="comment">// Client and Guest cannot update ACL and objectId</span>
+                <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">x</span>) <span class="op">=</span> <span class="ident">doc</span>.<span class="ident">remove</span>(<span class="ident">ACL</span>) {
+                    <span class="kw">return</span> <span class="ident">bad_request</span>(<span class="string">&quot;Cannot update ACL&quot;</span>);
+                }
+                <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">x</span>) <span class="op">=</span> <span class="ident">doc</span>.<span class="ident">remove</span>(<span class="ident">OBJECT_ID</span>) {
+                    <span class="kw">return</span> <span class="ident">bad_request</span>(<span class="string">&quot;Cannot update objectId&quot;</span>);
+                }
             }
         }
 
-        <span class="kw">let</span> <span class="ident">oid</span> <span class="op">=</span> <span class="ident">mongodb</span>::<span class="ident">bson</span>::<span class="ident">oid</span>::<span class="ident">ObjectId</span>::<span class="ident">with_string</span>(<span class="ident">id</span>).<span class="ident">unwrap</span>();
+        <span class="kw">if</span> <span class="ident">doc</span>.<span class="ident">is_empty</span>() {
+            <span class="kw">return</span> <span class="ident">bad_request</span>(<span class="string">&quot;Cannot update with empty data&quot;</span>);
+        }
 
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">filter</span> <span class="op">=</span> <span class="self">Self</span>::<span class="ident">write_filter</span>(<span class="kw-2">&amp;</span><span class="ident">user</span>);
-        <span class="ident">filter</span>.<span class="ident">insert</span>(<span class="self">Self</span>::<span class="ident">ID</span>, <span class="ident">oid</span>);
+        <span class="self">Self</span>::<span class="ident">update_doc</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">doc</span>, <span class="ident">Utc</span>::<span class="ident">now</span>());
 
+        <span class="kw">let</span> <span class="ident">oid</span> <span class="op">=</span> <span class="ident">mongodb</span>::<span class="ident">bson</span>::<span class="ident">oid</span>::<span class="ident">ObjectId</span>::<span class="ident">with_string</span>(<span class="ident">id</span>)
+            .<span class="ident">map_or_else</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> <span class="ident">not_found</span>(<span class="string">&quot;Object ID invalid&quot;</span>), <span class="op">|</span><span class="ident">d</span><span class="op">|</span> <span class="prelude-val">Ok</span>(<span class="ident">d</span>))<span class="question-mark">?</span>;
+
+        <span class="kw">let</span> <span class="ident">filter</span> <span class="op">=</span> <span class="macro">doc</span><span class="macro">!</span> {<span class="self">Self</span>::<span class="ident">ID</span>: <span class="ident">oid</span>};
+        <span class="kw">let</span> <span class="ident">filter</span> <span class="op">=</span> <span class="macro">doc</span><span class="macro">!</span>[<span class="string">&quot;$and&quot;</span>: <span class="macro">vec</span><span class="macro">!</span>[<span class="ident">filter</span>, <span class="self">Self</span>::<span class="ident">write_filter</span>(<span class="kw-2">&amp;</span><span class="ident">user</span>)]];
         <span class="macro">trace</span><span class="macro">!</span>(
             <span class="string">&quot;update {:?} by id {:?} with with {:?} filtered by {:?}&quot;</span>,
             <span class="ident">class</span>,
@@ -538,15 +617,24 @@
             .<span class="ident">await</span>;
 
         <span class="kw">match</span> <span class="ident">result</span> {
-            <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(<span class="ident">doc</span>)) <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Ok</span>(<span class="ident">doc</span>),
+            <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(<span class="ident">doc</span>)) <span class="op">=</span><span class="op">&gt;</span> {
+                <span class="kw">let</span> <span class="ident">doc</span> <span class="op">=</span> <span class="self">Self</span>::<span class="ident">expose</span>(<span class="ident">doc</span>);
+                <span class="macro">trace</span><span class="macro">!</span>(<span class="string">&quot;update result: {}&quot;</span>, <span class="ident">doc</span>);
+                <span class="prelude-val">Ok</span>(<span class="ident">doc</span>)
+            }
             <span class="prelude-val">Ok</span>(<span class="prelude-val">None</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">error</span>::<span class="ident">not_found</span>(<span class="string">&quot;Object not found&quot;</span>),
-            <span class="prelude-val">Err</span>(<span class="kw">_</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">error</span>::<span class="ident">internal_server_error</span>(<span class="string">&quot;Unexpected query error&quot;</span>),
+            <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span><span class="op">&gt;</span> {
+                <span class="macro">error</span><span class="macro">!</span>(<span class="string">&quot;update error {}&quot;</span>, <span class="ident">e</span>);
+                <span class="ident">error</span>::<span class="ident">internal_server_error</span>(<span class="string">&quot;Unexpected query error&quot;</span>)
+            }
         }
     }
 
     <span class="ident">async</span> <span class="kw">fn</span> <span class="ident">delete</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">class</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>, <span class="ident">id</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>, <span class="ident">user</span>: <span class="ident">UserKind</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Document</span>, <span class="ident">Rejection</span><span class="op">&gt;</span> {
         <span class="macro">trace</span><span class="macro">!</span>(<span class="string">&quot;delete {:?} by id {:?}&quot;</span>, <span class="ident">class</span>, <span class="ident">id</span>);
-        <span class="kw">let</span> <span class="ident">oid</span> <span class="op">=</span> <span class="ident">mongodb</span>::<span class="ident">bson</span>::<span class="ident">oid</span>::<span class="ident">ObjectId</span>::<span class="ident">with_string</span>(<span class="ident">id</span>).<span class="ident">unwrap</span>();
+        <span class="kw">let</span> <span class="ident">oid</span> <span class="op">=</span> <span class="ident">mongodb</span>::<span class="ident">bson</span>::<span class="ident">oid</span>::<span class="ident">ObjectId</span>::<span class="ident">with_string</span>(<span class="ident">id</span>)
+            .<span class="ident">map_or_else</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> <span class="ident">not_found</span>(<span class="string">&quot;Object ID invalid&quot;</span>), <span class="op">|</span><span class="ident">s</span><span class="op">|</span> <span class="prelude-val">Ok</span>(<span class="ident">s</span>))<span class="question-mark">?</span>;
+
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">filter</span> <span class="op">=</span> <span class="self">Self</span>::<span class="ident">write_filter</span>(<span class="kw-2">&amp;</span><span class="ident">user</span>);
         <span class="ident">filter</span>.<span class="ident">insert</span>(<span class="self">Self</span>::<span class="ident">ID</span>, <span class="ident">oid</span>);
 
@@ -556,7 +644,7 @@
             .<span class="ident">find_one_and_delete</span>(<span class="ident">filter</span>, <span class="prelude-val">None</span>)
             .<span class="ident">await</span>;
         <span class="kw">match</span> <span class="ident">result</span> {
-            <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(<span class="ident">doc</span>)) <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Ok</span>(<span class="ident">doc</span>),
+            <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(<span class="ident">doc</span>)) <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Ok</span>(<span class="self">Self</span>::<span class="ident">expose</span>(<span class="ident">doc</span>)),
             <span class="prelude-val">Ok</span>(<span class="prelude-val">None</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">error</span>::<span class="ident">not_found</span>(<span class="string">&quot;Object not found&quot;</span>),
             <span class="prelude-val">Err</span>(<span class="kw">_</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">error</span>::<span class="ident">internal_server_error</span>(<span class="string">&quot;Unexpected query error&quot;</span>),
         }
