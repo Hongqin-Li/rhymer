@@ -134,7 +134,7 @@ impl Mongodb {
     /// Write filter for certain user in MongoDB
     ///
     /// If user_id is found for this object such as `acl.user_id` is one of `i, r, w`,
-    /// representing that object is invisible, read-only, read-write to user_id respectively.
+    /// it means that the object is invisible, read-only, read-write to user_id respectively.
     ///
     /// Else if ACL not found for such user, try using the acl of `*` user
     ///

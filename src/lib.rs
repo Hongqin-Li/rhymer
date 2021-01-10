@@ -25,7 +25,7 @@ mod tests {
     use mongodb::bson::doc;
     use warp::{Filter, Rejection, Reply};
 
-    pub async fn test_api() -> impl Filter<Extract = impl Reply, Error = Rejection> + Clone {
+    pub async fn test_server() -> Server {
         pretty_env_logger::try_init();
 
         let mongo_user = "rhymer-test";
@@ -57,13 +57,17 @@ mod tests {
             }
         }
 
-        let mut r = Server::from_option(ServerConfig {
+        Server::from_option(ServerConfig {
             port: 8086,
             secret: "YOU WILL NEVER KNOWN".to_owned(),
             database_url: url,
             body_limit: 16 * 1024,
         })
-        .await;
+        .await
+    }
+
+    pub async fn test_api() -> impl Filter<Extract = impl Reply, Error = Rejection> + Clone {
+        let mut r = test_server().await;
         r.routes().await
     }
 }

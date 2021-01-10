@@ -42,22 +42,36 @@ impl Object {
         self.doc = doc;
     }
 
+    pub fn set_acl(&mut self, acl: Acl) {
+        self.acl = acl;
+    }
     pub fn get_acl(&self) -> Acl {
         self.acl.clone()
     }
 
     /// Update if id is provided, else create a new one.
     pub async fn save(&mut self) -> Result<Document, Rejection> {
+        let mut doc = self.doc.clone();
+
+        match self.user {
+            // Only Master can modify ACL.
+            UserKind::Master => {
+                let acl_doc: Document = self.acl.clone().into();
+                doc.insert(database::ACL, acl_doc);
+            }
+            _ => {}
+        };
+
         if let Some(id) = self.id.clone() {
             (*self.ctx)
                 .db
-                .update(&self.class, &id, self.doc.clone(), self.user.clone())
+                .update(&self.class, &id, doc, self.user.clone())
                 .await
         // Database guarantees the invariance of id, thus no need to update self.id
         } else {
             (*self.ctx)
                 .db
-                .create(&self.class, self.doc.clone(), self.user.clone())
+                .create(&self.class, doc, self.user.clone())
                 .await
                 .map(|d| {
                     let id = d
@@ -93,7 +107,7 @@ pub async fn create(
     let class = class.as_str();
     if let Some(f) = ctx.before_save.get(class) {
         trace!("before save(create): {}", class);
-        f(&mut req, ctx.clone()).await?;
+        req = f(req, ctx.clone()).await?;
     };
     if let Some(ref body) = req.body {
         let mut obj = Object::from(ctx.clone(), req.user.clone());
@@ -106,7 +120,7 @@ pub async fn create(
         })?;
         if let Some(f) = ctx.after_save.get(class) {
             trace!("after save(create): {}", class);
-            f(&mut req, ctx.clone()).await?;
+            req = f(req, ctx.clone()).await?;
         };
         Ok(warp::reply::with_status(
             result,
@@ -117,6 +131,7 @@ pub async fn create(
     }
 }
 
+/// TODO: Query instead of directly query db.
 pub async fn retrieve_by_filter(
     class: ClassName,
     filter: Document,
@@ -130,6 +145,7 @@ pub async fn retrieve_by_filter(
     })
 }
 
+/// TODO: use Query instead of directly query db.
 pub async fn retrieve(
     class: ClassName,
     id: String,
@@ -162,7 +178,7 @@ pub async fn update(
     let class = class.as_str();
     if let Some(f) = ctx.before_save.get(class) {
         trace!("before save(update): {}", class);
-        f(&mut req, ctx.clone()).await?;
+        req = f(req, ctx.clone()).await?;
     };
     if let Some(ref body) = req.body {
         let mut obj = Object::from(ctx.clone(), req.user.clone());
@@ -177,7 +193,7 @@ pub async fn update(
 
         if let Some(f) = ctx.after_save.get(class) {
             trace!("after save(update): {}", class);
-            f(&mut req, ctx.clone()).await?;
+            req = f(req, ctx.clone()).await?;
         };
         Ok(result)
     } else {
@@ -194,7 +210,7 @@ pub async fn delete(
     let class = class.as_str();
     if let Some(f) = ctx.before_destroy.get(class) {
         trace!("before destroy: {}", class);
-        f(&mut req, ctx.clone()).await?;
+        req = f(req, ctx.clone()).await?;
     };
 
     let mut obj = Object::from(ctx.clone(), req.user.clone());
@@ -207,7 +223,7 @@ pub async fn delete(
 
     if let Some(f) = ctx.after_destroy.get(class) {
         trace!("after destroy: {}", class);
-        f(&mut req, ctx.clone()).await?;
+        req = f(req, ctx.clone()).await?;
     };
     Ok(result)
 }
@@ -220,7 +236,7 @@ mod test {
     use serde_json::{json, Map, Value};
     use warp::hyper::StatusCode;
 
-    use super::super::tests::test_api;
+    use super::super::tests::{test_api, test_server};
 
     #[tokio::test]
     async fn test_crud() {
@@ -369,8 +385,16 @@ mod test {
         assert_eq!(resp.status(), StatusCode::OK);
     }
 
+    async fn test(a: i32) -> i32 {
+        1
+    }
+
     #[tokio::test]
     async fn test_acl() {
+        let s = test_server().await;
+        // let x = test;
+        // s.before_save("test", x)
+
         // Private ACL
 
         // Read test

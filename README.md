@@ -3,16 +3,38 @@
 [![CI Status](../../workflows/CI/badge.svg)](../../actions)
 [![Deploy Status](../../workflows/Deploy/badge.svg)](../../actions)
 
-Http server module in Rust
+API server module in Rust
 
-- [x] User login/signup
-- [x] Object
+- [x] (Tested) User login/signup
+- [x] (Tested) Object
 - [x] Access control
-- [x] Hook(before/after save, before/after destroy)
+- [x] (Tested) Hook(before/after save, before/after destroy)
 - [x] Function
-- [ ] Github CI and github page with cargo doc
-- [ ] Test
+- [x] Github CI and github page with cargo doc
 - [ ] User email
+
+## Usage
+
+### User
+
+
+### Object
+
+
+### File
+
+
+### Query
+
+
+### ACL
+
+
+### Hook
+
+
+### Function
+
 
 ## Development
 
