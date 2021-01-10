@@ -1,5 +1,0 @@
-(function() {var implementors = {};
-implementors["mio"] = [{"text":"impl&lt;T:&nbsp;Into&lt;Ready&gt;&gt; BitAndAssign&lt;T&gt; for Ready","synthetic":false,"types":[]}];
-implementors["num_bigint"] = [{"text":"impl BitAndAssign&lt;BigInt&gt; for BigInt","synthetic":false,"types":[]},{"text":"impl&lt;'a&gt; BitAndAssign&lt;&amp;'a BigInt&gt; for BigInt","synthetic":false,"types":[]},{"text":"impl BitAndAssign&lt;BigUint&gt; for BigUint","synthetic":false,"types":[]},{"text":"impl&lt;'a&gt; BitAndAssign&lt;&amp;'a BigUint&gt; for BigUint","synthetic":false,"types":[]}];
-implementors["subtle"] = [{"text":"impl BitAndAssign&lt;Choice&gt; for Choice","synthetic":false,"types":[]}];
-if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

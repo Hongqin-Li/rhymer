@@ -1,1 +1,0 @@
-initSidebarItems({"fn":[["deserialize","Deserialize unsigned types to `Bson::Double`"],["serialize","Serialize unsigned types to `Bson::Double`"]],"trait":[["FromF64","Converts from `f64` value"],["ToF64","Converts primitive unsigned types to `f64`"]]});
