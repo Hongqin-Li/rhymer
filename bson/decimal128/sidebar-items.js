@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["Decimal128","Decimal128 type."]]});

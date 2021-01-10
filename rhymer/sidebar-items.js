@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["Document","A BSON document represented as an associative HashMap with insertion ordering."],["Server","The server"],["ServerConfig","Server configuration"]]});

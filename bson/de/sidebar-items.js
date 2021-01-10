@@ -1,0 +1,1 @@
+initSidebarItems({"enum":[["Error","Possible errors that can arise during decoding."]],"fn":[["from_bson","Decode a BSON `Value` into a `T` Deserializable."],["from_document","Decode a BSON `Document` into a `T` Deserializable."]],"struct":[["Deserializer","Serde Deserializer"]],"type":[["Result","Alias for `Result<T, Error>`."]]});
