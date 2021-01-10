@@ -1,28 +1,33 @@
-use std::{convert::Infallible, sync::Arc};
+use std::{
+    collections::HashMap,
+    convert::{Infallible, TryFrom},
+    pin::Pin,
+    sync::{Arc, Mutex},
+};
 
 use error::{bad_request, internal_server_error};
 use mongodb::bson::Document;
 use serde::{de::DeserializeOwned, private::de::IdentifierDeserializer};
+use serde_json::{Map, Value};
 use user::{decode_token, ClientToken};
 use warp::{
     body::aggregate,
     hyper::HeaderMap,
     reject::{self, Reject},
-    Buf,
+    Buf, Future,
 };
 use warp::{Filter, Rejection};
 
 use crate::{
     database::{Database as _, Mongodb as Database},
     error,
-    function::{Function, Functions},
+    function::{self, FuncMap, Function, HookFunc, HookMap},
     object::{self, Object},
     user::{self, User, UserKind},
     validator::ClassName,
 };
 
-// Per-request data passed to Rhymer.
-
+/// Per-request data passed to Rhymer.
 #[derive(Debug, Clone)]
 pub struct Request {
     pub headers: warp::http::HeaderMap,
@@ -32,11 +37,37 @@ pub struct Request {
     pub user: UserKind,
 }
 
-// Per-server data passed on to Rhymer.
-#[derive(Debug, Clone)]
+/// Per-server data passed on to Rhymer.
+#[derive(Clone)]
 pub struct Context {
     pub config: ServerConfig,
     pub db: Database,
+    pub before_save: HookMap,
+    pub after_save: HookMap,
+    pub before_destroy: HookMap,
+    pub after_destroy: HookMap,
+    pub function: FuncMap,
+}
+
+// Helper functions, which is passed on to server-side hooks and functions.
+impl Context {
+    /// Login with username and password
+    pub async fn login(self: Arc<Self>, name: &str, pwd: &str) -> Result<User, ()> {
+        let mut u = User::with_context(self);
+        u.login(name, pwd).await.map_or_else(|e| Err(()), |t| Ok(u))
+    }
+
+    /// Create an object in specific class
+    pub fn object(self: Arc<Self>, class: &str) -> Object {
+        let mut obj = Object::from(self, UserKind::Master);
+        obj.set_class(class);
+        obj
+    }
+
+    /// Run a function by name
+    pub fn f(self: Arc<Self>, name: &str) -> Function {
+        unimplemented!();
+    }
 }
 
 fn with_context(
@@ -68,7 +99,13 @@ fn with_req(
 ) -> impl Filter<Extract = (Request,), Error = Rejection> + Clone {
     let key: String = key.into();
     warp::header::headers_cloned().and(warp::body::json()).map(
-        move |headers: HeaderMap, body: Option<Document>| {
+        move |headers: HeaderMap, body: Map<String, Value>| {
+            // See https://github.com/mongodb/bson-rust/issues/189
+            let body = Document::try_from(body).map_or_else(|e| {
+                warn!("request body deserialized failed");
+                None
+            }, |d| Some(d)
+            );
             let user = parse_user(&headers, &key);
             Request {
                 headers,
@@ -94,7 +131,7 @@ fn with_req_without_body(
 }
 
 /// Server configuration
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct ServerConfig {
     /// port
     pub port: u16,
@@ -110,118 +147,115 @@ pub struct ServerConfig {
 }
 
 /// The server
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct Server {
     config: ServerConfig,
-    context: Arc<Context>,
-}
-
-// Rhymer server instance, which is passed to server-side hooks and functions.
-impl Server {
-    /// Login with username and password
-    pub async fn login(&self, name: &str, pwd: &str) -> Result<User, ()> {
-        let mut u = User::with_context(self.context.clone());
-        u.login(name, pwd).await.map_or_else(|e| Err(()), |t| Ok(u))
-    }
-
-    /// Create an object in specific class
-    pub fn object(&self, class: &str) -> Object {
-        Object::from(self.context.clone(), UserKind::Master)
-    }
-
-    /// Run a function by name
-    pub fn f(&self, name: &str) -> Function {
-        unimplemented!();
-    }
+    before_save: HookMap,
+    after_save: HookMap,
+    before_destroy: HookMap,
+    after_destroy: HookMap,
+    function: FuncMap,
 }
 
 impl Server {
     /// Create a server from option
     pub async fn from_option(config: ServerConfig) -> Self {
-        let context = Arc::new(Context {
-            db: Database::from_url(config.database_url.clone()).await,
-            config: config.clone(), //func: Functions::default(),
-        });
-        Server { config, context }
+        Self {
+            config,
+            ..Server::default()
+        }
     }
 
-    /// Run a server
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use pretty_env_logger;
-    /// use rhymer::{Server, ServerConfig};
-    /// use tokio;
+    /// Register a before save hook function.
+    pub fn before_save(&mut self, class_name: impl Into<String>, f: HookFunc) {
+        self.before_save.insert(class_name.into(), f);
+    }
+    /// Register a after save hook function.
+    pub fn after_save(&mut self, class_name: impl Into<String>, f: HookFunc) {
+        self.after_save.insert(class_name.into(), f);
+    }
+    /// Register a before destroy hook function.
+    pub fn before_destroy(&mut self, class_name: impl Into<String>, f: HookFunc) {
+        self.before_destroy.insert(class_name.into(), f);
+    }
+    /// Register a after destroy hook function.
+    pub fn after_destroy(&mut self, class_name: impl Into<String>, f: HookFunc) {
+        self.after_destroy.insert(class_name.into(), f);
+    }
 
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     pretty_env_logger::init();
-    ///     let mongo_user = "openbaas";
-    ///     let mongo_pwd = "openbaas";
-    ///     let mongo_db = "dev";
-    ///     let mut r = Server::from_option(ServerConfig {
-    ///         port: 8086,
-    ///         secret: "YOU WILL NEVER KNOWN".to_owned(),
-    ///         database_url: format!(
-    ///             "mongodb://{}:{}@localhost:27017/{}",
-    ///             mongo_user, mongo_pwd, mongo_db
-    ///         ),
-    ///         body_limit: 16 * 1024,
-    ///     })
-    ///     .await;
-    ///     r.run().await;
-    /// }
-    /// ```
-    pub async fn run(&mut self) {
-        let get = warp::get()
-            .and(with_req_without_body(self.config.secret.clone()))
-            .and(with_context(self.context.clone()));
-        let post = warp::post()
-            .and(with_req(self.config.secret.clone()))
-            .and(with_context(self.context.clone()));
-        let put = warp::put()
-            .and(with_req(self.config.secret.clone()))
-            .and(with_context(self.context.clone()));
-        let delete = warp::delete()
-            .and(with_req_without_body(self.config.secret.clone()))
-            .and(with_context(self.context.clone()));
+    /// Register a function to be invoked by api.
+    pub fn define(&mut self, name: impl Into<String>, f: Function) {
+        self.function.insert(name.into(), f);
+    }
 
-        let signup = post.clone().and(warp::path("users")).and_then(user::signup);
+    /// Warp's filters for routing.
+    pub async fn routes(
+        &mut self,
+    ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+        let context = Arc::new(Context {
+            db: Database::from_url(self.config.database_url.clone()).await,
+            config: self.config.clone(),
+            before_save: self.before_save.clone(),
+            after_save: self.after_save.clone(),
+            before_destroy: self.before_destroy.clone(),
+            after_destroy: self.after_destroy.clone(),
+            function: self.function.clone(),
+        });
 
-        let login = get
-            .clone()
-            .and(warp::path("login"))
-            .and(warp::query::<user::LoginQuery>())
-            .and_then(user::login);
+        // Body extraction must be at last to avoid multiple extraction.
+        macro_rules! get {
+            ($($e:expr), *) => {
+                warp::get()
+                    $(.and($e))*
+                    .and(with_req_without_body(self.config.secret.clone()))
+                    .and(with_context(context.clone()));
+            }
+        }
+
+        macro_rules! post {
+            ($($e:expr), *) => {
+                warp::post()
+                    $(.and($e))*
+                    .and(with_req(self.config.secret.clone()))
+                    .and(with_context(context.clone()));
+            }
+        }
+
+        macro_rules! put {
+            ($($e:expr), *) => {
+                warp::put()
+                    $(.and($e))*
+                    .and(with_req(self.config.secret.clone()))
+                    .and(with_context(context.clone()));
+            }
+        }
+
+        macro_rules! delete {
+            ($($e:expr), *) => {
+                warp::delete()
+                    $(.and($e))*
+                    .and(with_req_without_body(self.config.secret.clone()))
+                    .and(with_context(context.clone()));
+            }
+        }
+
+        let signup = post!(warp::path("users")).and_then(user::signup);
+
+        let login =
+            get!(warp::path("login"), warp::query::<user::LoginQuery>()).and_then(user::login);
 
         let user_routes = signup.or(login);
 
-        let create = post
-            .clone()
-            .and(warp::path!("classes" / ClassName))
-            .and_then(object::create);
+        let create = post!(warp::path!("classes" / ClassName)).and_then(object::create);
 
-        let retrieve = get
-            .clone()
-            .and(warp::path!("classes" / ClassName / String))
-            .and_then(object::retrieve);
+        let retrieve = get!(warp::path!("classes" / ClassName / String)).and_then(object::retrieve);
 
-        let retrieve_by_filter = get
-            .clone()
-            .and(warp::path!("classes" / ClassName))
-            .and(warp::query())
+        let retrieve_by_filter = get!(warp::path!("classes" / ClassName), warp::query())
             .and_then(object::retrieve_by_filter);
 
-        let update = put
-            .clone()
-            .and(warp::path!("classes" / ClassName / String))
-            .and_then(object::update);
+        let update = put!(warp::path!("classes" / ClassName / String)).and_then(object::update);
 
-        let delete = delete
-            .clone()
-            .and(warp::path!("classes" / ClassName / String))
-            .and_then(object::delete);
+        let delete = delete!(warp::path!("classes" / ClassName / String)).and_then(object::delete);
 
         let object_routes = create
             .or(retrieve)
@@ -229,11 +263,20 @@ impl Server {
             .or(update)
             .or(delete);
 
+        let function_route =
+            get!(warp::path!("functions" / String), warp::query()).and_then(function::run);
+
         let routes = user_routes
             .or(object_routes)
+            .or(function_route)
             .recover(error::handle_rejection);
 
-        warp::serve(routes)
+        routes
+    }
+
+    /// Run this `Server` forever on the current thread.
+    pub async fn run(&mut self) {
+        warp::serve(self.routes().await)
             .run(([127, 0, 0, 1], self.config.port))
             .await;
     }

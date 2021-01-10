@@ -4,11 +4,11 @@ curl="curl"
 
 if [ "$cmd" = "signup" ]; then
     $curl -X POST -H "Content-Type: application/json" \
-         -d '{"username":"cooldude6","password":"p_n7!-e8","phone":"415-392-0202"}' \
+         -d '{"username":"foo","password":"123","phone":"415-392-0202"}' \
          $host/users
 
 elif [ "$cmd" = "login" ]; then
-    $curl -X GET "$host/login?username=foo&password=bar"
+    $curl -X GET "$host/login?username=foo&password=123"
 
 elif [ "$cmd" = "create" ]; then
     $curl -X POST -H "Content-Type: application/json" \

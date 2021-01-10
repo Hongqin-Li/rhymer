@@ -209,6 +209,7 @@ impl Database for Mongodb {
                 Err(_) => return internal_server_error("retrieve error"),
             }
         }
+        trace!("retrieve result: {:?}", docs);
         Ok(docs)
     }
 

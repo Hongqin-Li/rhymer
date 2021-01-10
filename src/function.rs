@@ -1,17 +1,35 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, pin::Pin, sync::Arc};
 
-type HookMap = HashMap<String, Vec<fn() -> i32>>;
-type Inits = Vec<fn() -> i32>;
-type CodeMap = HashMap<String, Vec<fn() -> i32>>;
+use warp::{Future, Rejection, Reply};
 
-pub struct Function {}
+use crate::{
+    error::not_found,
+    server::{Context, Request},
+};
 
-#[derive(Debug, Clone, Default)]
-pub struct Functions {
-    before_save: HookMap,
-    after_save: HookMap,
-    before_delete: HookMap,
-    after_delete: HookMap,
-    init: Inits,
-    cloud_code: CodeMap,
+pub type HookFunc = Box<
+    fn(&mut Request, Arc<Context>) -> Pin<Box<dyn Future<Output = Result<(), Rejection>> + Send>>,
+>;
+pub type Function = Box<
+    fn(
+        &mut Request,
+        Arc<Context>,
+        HashMap<String, String>,
+    ) -> Pin<Box<dyn Future<Output = Result<String, Rejection>> + Send>>,
+>;
+pub type HookMap = HashMap<String, HookFunc>;
+pub type FuncMap = HashMap<String, Function>;
+
+pub async fn run(
+    name: String,
+    arg: HashMap<String, String>,
+    mut req: Request,
+    ctx: Arc<Context>,
+) -> Result<impl Reply, Rejection> {
+    if let Some(f) = ctx.function.get(&name) {
+        trace!("run function '{}', args {:?}", name, arg.clone());
+        f(&mut req, ctx.clone(), arg).await
+    } else {
+        not_found(format!("function '{}' not found", name))
+    }
 }

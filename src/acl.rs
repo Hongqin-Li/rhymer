@@ -103,6 +103,15 @@ impl Acl {
     pub fn set_writable(&mut self, user_id: impl Into<String>) {
         self.user.insert(user_id.into(), AclKind::ReadWrite);
     }
+    pub fn set_public_readonly(&mut self) {
+        self.other = AclKind::ReadOnly;
+    }
+    pub fn set_public_invisiable(&mut self) {
+        self.other = AclKind::Invisible;
+    }
+    pub fn set_public_writable(&mut self, user_id: impl Into<String>) {
+        self.other = AclKind::ReadWrite;
+    }
 }
 
 impl Into<Document> for Acl {

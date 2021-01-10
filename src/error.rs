@@ -47,6 +47,13 @@ pub fn not_found<T>(msg: impl Into<String>) -> Result<T, Rejection> {
     }))
 }
 
+pub fn conflict<T>(msg: impl Into<String>) -> Result<T, Rejection> {
+    Err(reject::custom(Error {
+        message: msg.into(),
+        code: StatusCode::CONFLICT,
+    }))
+}
+
 pub async fn handle_rejection(r: Rejection) -> Result<impl Reply, Rejection> {
     trace!("{:?}", r);
     if let Some(err) = r.find::<Error>() {

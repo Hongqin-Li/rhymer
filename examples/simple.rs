@@ -5,9 +5,9 @@ use tokio;
 #[tokio::main]
 async fn main() {
     pretty_env_logger::init();
-    let mongo_user = "openbaas";
-    let mongo_pwd = "openbaas";
-    let mongo_db = "dev";
+    let mongo_user = "rhymer-test";
+    let mongo_pwd = "rhymer-test";
+    let mongo_db = "rhymer-test";
     let mut r = Server::from_option(ServerConfig {
         port: 8086,
         secret: "YOU WILL NEVER KNOWN".to_owned(),
