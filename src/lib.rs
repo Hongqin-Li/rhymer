@@ -20,6 +20,7 @@ pub mod error;
 mod validator;
 
 pub use acl::Acl;
+pub use file::File;
 pub use mongodb::bson::Document;
 pub use server::Config;
 pub use server::Context;
@@ -38,31 +39,14 @@ mod tests {
     pub const TEST_SERVER_KEY: &str = "xxx";
 
     pub const TEST_USER_ID: &str = "id";
-    pub const TEST_USER_NAME: &str = "admin";
-    pub const TEST_USER_PWD: &str = "admin";
-
-    lazy_static! {
-        pub static ref TEST_USER_TOKEN: String = {
-            let now = chrono::Utc::now().timestamp();
-
-            let t = crate::user::ClientToken {
-                sub: TEST_USER_ID.to_string(),
-                id: TEST_USER_ID.to_string(),
-                name: crate::tests::TEST_USER_NAME.to_string(),
-                exp: now + 10000,
-            };
-            crate::user::encode_token(&t, crate::tests::TEST_SERVER_KEY)
-                .expect("error when encoding")
-        };
-    }
 
     /// Helper macro for testing requests that requires user login.
     #[macro_export]
-    macro_rules! with_test_user {
-        ($method:expr) => {
+    macro_rules! with_user {
+        ($id:expr, $method:expr) => {
             warp::test::request()
                 .method($method)
-                .header("x-parse-session-token", &*crate::tests::TEST_USER_TOKEN)
+                .header("x-parse-session-token", crate::user::tests::tmp_token($id))
         };
     }
 
@@ -106,11 +90,6 @@ mod tests {
             server_url: "useless".to_string(),
         })
         .await;
-
-        let api = r.routes().await;
-
-        signup1!(&api, TEST_USER_NAME, TEST_USER_PWD);
-
         r
     }
 

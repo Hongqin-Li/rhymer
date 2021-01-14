@@ -212,6 +212,19 @@ pub(crate) mod tests {
 
     use super::{super::tests::test_api, decode_token, encode_token, ClientToken};
 
+    /// Create a temp user token by user ID `uid` with expiration time of 10000s.
+    pub fn tmp_token(uid: impl Into<String>) -> String {
+        let now = chrono::Utc::now().timestamp();
+        let id: String = uid.into();
+        let t = crate::user::ClientToken {
+            sub: id.clone(),
+            id: id.clone(),
+            name: "whatever".to_string(),
+            exp: now + 10000,
+        };
+        encode_token(&t, crate::tests::TEST_SERVER_KEY).expect("error when encoding")
+    }
+
     /// Helper macro for testing user log in.
     #[macro_export]
     macro_rules! login1 {

@@ -66,7 +66,7 @@ mod test {
         file::File,
         server::{Context, Request},
         tests::TEST_SERVER_KEY,
-        with_test_user,
+        with_user,
     };
 
     use super::super::tests::{test_api, test_server};
@@ -102,7 +102,7 @@ mod test {
         reset_cnt();
 
         let create1 = async move |api, class, body| {
-            with_test_user!("POST")
+            with_user!("foo", "POST")
                 .path(&format!("/classes/{}", class))
                 .json(&body)
                 .reply(api)
@@ -189,7 +189,7 @@ mod test {
         let appid = "test-appid";
 
         let create1 = async move |api, name, body| {
-            with_test_user!("POST")
+            with_user!("foo", "POST")
                 .header("x-parse-application-id", appid)
                 .path(&format!("/files/{}", name))
                 .body(&body)

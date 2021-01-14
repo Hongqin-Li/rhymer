@@ -281,7 +281,20 @@ mod test {
         debug!("resp: {:?}", resp);
         assert_eq!(resp.status(), StatusCode::METHOD_NOT_ALLOWED);
 
-        // Test create object data.
+        // Test create several objects.
+        let resp = create1(
+            &api,
+            "foo",
+            json!({
+                "test-string": "a",
+                "test-int": 1,
+                "test-bool": true,
+                "test-array": [-1, 1000000000000 as i64, "b", false],
+            }),
+        )
+        .await;
+        assert_eq!(resp.status(), StatusCode::CREATED);
+
         let resp = create1(
             &api,
             "foo",
@@ -383,22 +396,5 @@ mod test {
         // Test delete successfully.
         let resp = delete1(&api, "foo", id).await;
         assert_eq!(resp.status(), StatusCode::OK);
-    }
-
-    async fn test(a: i32) -> i32 {
-        1
-    }
-
-    #[tokio::test]
-    async fn test_acl() {
-        let s = test_server().await;
-        // let x = test;
-        // s.before_save("test", x)
-
-        // Private ACL
-
-        // Read test
-
-        // Writable.
     }
 }

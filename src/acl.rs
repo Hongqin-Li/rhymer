@@ -120,7 +120,7 @@ impl Acl {
     }
 
     /// Set writable by other users.
-    pub fn set_public_writable(&mut self, user_id: impl Into<String>) {
+    pub fn set_public_writable(&mut self) {
         self.other = AclKind::ReadWrite;
     }
 }
@@ -141,7 +141,7 @@ impl Into<Document> for Acl {
                 },
             );
         }
-        doc! {database::ACL: d}
+        d
     }
 }
 
@@ -149,12 +149,14 @@ impl Into<Document> for Acl {
 mod tests {
     use std::sync::Arc;
 
+    use serde_json::json;
     use warp::{hyper::StatusCode, Rejection};
 
     use crate::{
         server::{Context, Request},
         tests::test_server,
         user::UserKind,
+        with_user,
     };
 
     use super::*;
@@ -179,44 +181,180 @@ mod tests {
         assert!(acl.readable_by_user(uid) && acl.writable_by_user(uid));
     }
 
-    async fn save_private_obj(
+    const ACL_TEST_USERS: &[&'static str] = &["a", "b"];
+
+    async fn save_acl(
         req: Request,
         ctx: Arc<Context>,
         arg: HashMap<String, String>,
     ) -> Result<String, Rejection> {
         let mut obj = ctx.object("test");
         let mut acl = Acl::new();
-        acl.set_public_invisiable();
-        if let UserKind::Client(c) = req.user {
-            acl.set_writable(c.id);
+
+        let public_acc = arg.get("public").unwrap();
+        if public_acc == "0" {
+            acl.set_public_invisiable();
+        } else if public_acc == "1" {
+            acl.set_public_readonly();
+        } else if public_acc == "2" {
+            acl.set_public_writable();
+        } else {
+            panic!("unexpected acl code {}", public_acc);
         }
+
+        for uid in ACL_TEST_USERS.iter() {
+            let uid = uid.to_string();
+            let acc = arg.get(&uid).unwrap();
+            if acc == "0" {
+                acl.set_invisiable(&uid);
+            } else if acc == "1" {
+                acl.set_readonly(&uid);
+            } else if acc == "2" {
+                acl.set_writable(&uid);
+            } else {
+                panic!("unexpected acl code {}", public_acc);
+            }
+        }
+
+        let data = doc! { "name": "a"};
         obj.set_acl(acl);
-        obj.save().await?;
-        Ok(arg.get("bar").map_or("none".to_string(), |s| s.to_owned()))
+        obj.set_doc(data);
+        let r = obj.save().await?;
+        Ok(r.get_str("objectId").unwrap().to_string())
     }
 
     #[tokio::test]
     async fn test_acl() {
         let mut s = test_server().await;
         s.define(
-            "private",
-            Box::new(|req, ctx, arg| Box::pin(save_private_obj(req, ctx, arg))),
+            "testf",
+            Box::new(|req, ctx, arg| Box::pin(save_acl(req, ctx, arg))),
         );
-
-        let api = s.routes().await;
 
         let invoke1 = async move |api, name, query| {
             warp::test::request()
                 .method("GET")
-                .path(&format!("/functions/{}?{}", name, query))
+                .path(&format!("/functions/{}?{}", &name, &query))
                 .reply(api)
                 .await
         };
-        let resp = invoke1(&api, "xxx", "").await;
-        assert_eq!(resp.status(), StatusCode::NOT_FOUND);
-        let resp = invoke1(&api, "private", "a=1&bar=2").await;
-        assert_eq!(resp.status(), StatusCode::OK);
-        assert_eq!(String::from_utf8(resp.body()[..].to_vec()).unwrap(), "2");
-        // TODO:
+
+        let retrieve1 = async move |api, uid, class, id| {
+            with_user!(uid, "GET")
+                .path(&format!("/classes/{}/{}", class, id))
+                .reply(api)
+                .await
+        };
+        let retrieve1_public = async move |api, class, id| {
+            warp::test::request()
+                .method("GET")
+                .path(&format!("/classes/{}/{}", class, id))
+                .reply(api)
+                .await
+        };
+        let update1 = async move |api, uid, class, id, body| {
+            with_user!(uid, "PUT")
+                .path(&format!("/classes/{}/{}", class, id))
+                .json(&body)
+                .reply(api)
+                .await
+        };
+        let update1_public = async move |api, class, id, body| {
+            warp::test::request()
+                .method("PUT")
+                .path(&format!("/classes/{}/{}", class, id))
+                .json(&body)
+                .reply(api)
+                .await
+        };
+
+        let delete1 = async move |api, uid, class, id| {
+            with_user!(uid, "DELETE")
+                .path(&format!("/classes/{}/{}", class, id))
+                .reply(api)
+                .await
+        };
+
+        let delete1_public = async move |api, class, id| {
+            warp::test::request()
+                .method("DELETE")
+                .path(&format!("/classes/{}/{}", class, id))
+                .reply(api)
+                .await
+        };
+
+        let api = s.routes().await;
+
+        let max_code = 3u64.pow((ACL_TEST_USERS.len() + 1) as u32);
+        for i in 0..max_code {
+            let mut j = i;
+            let public_code = j % 3;
+            let mut query_str = format!("public={}", public_code);
+            j /= 3;
+
+            let mut user_code = vec![];
+            for uid in ACL_TEST_USERS {
+                let code = j % 3;
+                user_code.push(code);
+                query_str += &format!("&{}={}", &uid, &code);
+                j /= 3;
+            }
+            let resp = invoke1(&api, "testf", query_str.clone()).await;
+            assert_eq!(resp.status(), StatusCode::OK);
+            let oid = String::from_utf8_lossy(&resp.body()[..]).to_string();
+
+            // Public guest.
+            let r = retrieve1_public(&api, "test", oid.clone()).await;
+            let u = update1_public(&api, "test", oid.clone(), json!({"name": "whatever"})).await;
+            if public_code == 0 {
+                assert_eq!(r.status(), StatusCode::NOT_FOUND);
+                assert_eq!(u.status(), StatusCode::NOT_FOUND);
+            } else if public_code == 1 {
+                assert_eq!(r.status(), StatusCode::OK);
+                assert_eq!(u.status(), StatusCode::NOT_FOUND);
+            } else {
+                assert_eq!(r.status(), StatusCode::OK);
+                assert_eq!(u.status(), StatusCode::OK);
+            }
+
+            // Client.
+            for (i, code) in user_code.iter().enumerate() {
+                let uid = ACL_TEST_USERS[i];
+                let code = code.clone();
+                let r = retrieve1(&api, uid, "test", oid.clone()).await;
+                let u = update1(&api, uid, "test", oid.clone(), json!({"name": "whatever"})).await;
+
+                if code == 0 {
+                    assert_eq!(r.status(), StatusCode::NOT_FOUND);
+                    assert_eq!(u.status(), StatusCode::NOT_FOUND);
+                } else if code == 1 {
+                    assert_eq!(r.status(), StatusCode::OK);
+                    assert_eq!(u.status(), StatusCode::NOT_FOUND);
+                } else {
+                    assert_eq!(r.status(), StatusCode::OK);
+                    assert_eq!(u.status(), StatusCode::OK);
+                }
+            }
+
+            // Test deletion.
+            let d = delete1_public(&api, "test", oid.clone()).await;
+            if public_code == 2 {
+                assert_eq!(d.status(), StatusCode::OK);
+                continue;
+            } else {
+                assert_eq!(d.status(), StatusCode::NOT_FOUND);
+            }
+            for (i, code) in user_code.iter().enumerate() {
+                let uid = ACL_TEST_USERS[i];
+                let code = code.clone();
+                let d = delete1(&api, uid, "test", oid.clone()).await;
+                if code == 2 {
+                    assert_eq!(d.status(), StatusCode::OK);
+                    break;
+                } else {
+                    assert_eq!(d.status(), StatusCode::NOT_FOUND);
+                }
+            }
+        }
     }
 }

@@ -71,20 +71,20 @@ pub struct Context {
 
 // Helper functions, which is passed on to server-side hooks and functions.
 impl Context {
-    /// Login with username and password
+    /// Login with username and password.
     pub async fn login(self: Arc<Self>, name: &str, pwd: &str) -> Result<User, ()> {
         let mut u = User::with_context(self);
         u.login(name, pwd).await.map_or_else(|e| Err(()), |t| Ok(u))
     }
 
-    /// Create an object in specific class
+    /// Create an object in specific class.
     pub fn object(self: Arc<Self>, class: &str) -> Object {
         let mut obj = Object::from(self, UserKind::Master);
         obj.set_class(class);
         obj
     }
 
-    /// Run a function by name
+    /// Run a function by name.
     pub fn f(self: Arc<Self>, name: &str) -> Function {
         unimplemented!();
     }

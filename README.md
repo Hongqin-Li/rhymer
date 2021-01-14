@@ -8,7 +8,7 @@ API server module in Rust using [warp](https://github.com/seanmonstar/warp) and 
 - [x] (Tested) User login/signup
 - [x] (Tested) Object
 - [x] (Tested) File upload/retrieve/delete, upload binary by application/x-www-form-urlencoded 
-- [x] Access control
+- [x] (Tested) Access control
 - [x] (Tested) Hook(before/after save/destroy object, before/after save/delete file)
 - [x] (Tested) Function
 - [x] Github CI with `cargo test` and Github page with `cargo doc`
