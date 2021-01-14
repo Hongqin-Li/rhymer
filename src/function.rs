@@ -4,6 +4,7 @@ use warp::{Future, Rejection, Reply};
 
 use crate::{
     error::not_found,
+    file::File,
     server::{Context, Request},
 };
 
@@ -12,6 +13,13 @@ pub type HookFunc = Box<
         Request,
         Arc<Context>,
     ) -> Pin<Box<dyn Future<Output = Result<Request, Rejection>> + Send + 'static>>,
+>;
+pub type FileHook = Box<
+    fn(
+        File,
+        Request,
+        Arc<Context>,
+    ) -> Pin<Box<dyn Future<Output = Result<File, Rejection>> + Send + 'static>>,
 >;
 pub type Function = Box<
     fn(
@@ -42,6 +50,8 @@ mod test {
     use std::{
         collections::HashMap,
         convert::TryFrom,
+        fs,
+        path::PathBuf,
         sync::{Arc, Mutex},
         thread::sleep,
         time::Duration,
@@ -53,7 +63,10 @@ mod test {
 
     use crate::{
         error::bad_request,
+        file::File,
         server::{Context, Request},
+        tests::TEST_SERVER_KEY,
+        with_test_user,
     };
 
     use super::super::tests::{test_api, test_server};
@@ -61,6 +74,9 @@ mod test {
 
     lazy_static! {
         static ref CNT: Mutex<i32> = Mutex::new(0);
+    }
+    fn reset_cnt() {
+        *CNT.lock().unwrap() = 0;
     }
 
     async fn inc(req: Request, ctx: Arc<Context>) -> Result<Request, Rejection> {
@@ -76,11 +92,17 @@ mod test {
         bad_request("test err")
     }
 
+    async fn test_file(f: File, req: Request, ctx: Arc<Context>) -> Result<File, Rejection> {
+        *CNT.lock().unwrap() += 1;
+        Ok(f)
+    }
+
     #[tokio::test]
     async fn test_hooks() {
+        reset_cnt();
+
         let create1 = async move |api, class, body| {
-            warp::test::request()
-                .method("POST")
+            with_test_user!("POST")
                 .path(&format!("/classes/{}", class))
                 .json(&body)
                 .reply(api)
@@ -159,6 +181,66 @@ mod test {
             assert_eq!(resp.status(), StatusCode::OK);
         }
         assert_eq!(*CNT.lock().unwrap(), -(ids.len() as i32));
+    }
+
+    #[tokio::test]
+    async fn test_file_hooks() {
+        reset_cnt();
+        let appid = "test-appid";
+
+        let create1 = async move |api, name, body| {
+            with_test_user!("POST")
+                .header("x-parse-application-id", appid)
+                .path(&format!("/files/{}", name))
+                .body(&body)
+                .reply(api)
+                .await
+        };
+        let delete1 = async move |api, appid, fname| {
+            warp::test::request()
+                .header("x-parse-master-key", TEST_SERVER_KEY)
+                .method("DELETE")
+                .path(&format!("/files/{}/{}", appid, fname))
+                .reply(api)
+                .await
+        };
+
+        // Test before/after save file.
+        let mut s = test_server().await;
+        s.before_save_file(Box::new(|f, req, ctx| Box::pin(test_file(f, req, ctx))));
+        s.after_save_file(Box::new(|f, req, ctx| Box::pin(test_file(f, req, ctx))));
+        s.before_delete_file(Box::new(|f, req, ctx| Box::pin(test_file(f, req, ctx))));
+        s.after_delete_file(Box::new(|f, req, ctx| Box::pin(test_file(f, req, ctx))));
+
+        let api = s.routes().await;
+        let content = json!({"name": "a"}).to_string();
+        let resp = create1(&api, "foo", &content).await;
+        let body = Document::try_from(
+            serde_json::from_slice::<Map<String, Value>>(&resp.body()[..]).unwrap(),
+        )
+        .unwrap();
+        dbg!(&resp);
+        assert_eq!(resp.status(), StatusCode::CREATED);
+        assert!(body.get("url").is_some());
+        assert!(body.get("name").is_some());
+        assert_eq!(*CNT.lock().unwrap(), 2);
+
+        let url = body.get_str("url").unwrap();
+        let mut url_paths: Vec<&str> = url.split('/').collect();
+        assert!(url_paths.len() > 3);
+        let url_fname = url_paths.pop().unwrap();
+        let url_appid = url_paths.pop().unwrap();
+        assert_eq!(url_appid, appid);
+
+        let p = PathBuf::from(format!("./files/{}/{}", &url_appid, &url_fname));
+        let s = fs::read_to_string(dbg!(&p)).expect("failed to read file");
+        assert_eq!(s, content);
+
+        // Test before/after delete file.
+        let resp = delete1(&api, url_appid, url_fname).await;
+        assert_eq!(resp.status(), StatusCode::OK);
+        assert_eq!(*CNT.lock().unwrap(), 4);
+        assert_eq!(p.exists(), false);
     }
 
     async fn test_f(

@@ -5,64 +5,57 @@ use warp::{
     Rejection,
 };
 
+use paste::paste;
+
 #[derive(Debug)]
 struct Error {
-    message: String,
+    error: String,
     code: StatusCode,
 }
 
 #[derive(serde::Serialize)]
 struct ErrorMessage {
     code: u16,
-    message: String,
+    error: String,
 }
 
 impl Reject for Error {}
 
-pub fn unauthorized<T>(msg: impl Into<String>) -> Result<T, Rejection> {
-    Err(reject::custom(Error {
-        message: msg.into(),
-        code: StatusCode::UNAUTHORIZED,
-    }))
+macro_rules! err1 {
+    ($e:ident, $se:expr) => {
+
+        #[doc = "Rejection with error `"]
+        #[doc = $se]
+        #[doc = "`"]
+        pub fn $e<T>(msg: impl Into<String>) -> Result<T, Rejection> {
+            Err(reject::custom(Error {
+                error: msg.into(),
+                code: paste! { StatusCode:: [<$e:upper>] },
+            }))
+        }
+    };
+}
+macro_rules! err {
+    ($e:ident) => {
+        err1!($e, stringify!($e));
+    };
 }
 
-pub fn bad_request<T>(msg: impl Into<String>) -> Result<T, Rejection> {
-    Err(reject::custom(Error {
-        message: msg.into(),
-        code: StatusCode::BAD_REQUEST,
-    }))
-}
+err!(unauthorized);
+err!(bad_request);
+err!(internal_server_error);
+err!(not_found);
+err!(conflict);
 
-pub fn internal_server_error<T>(msg: impl Into<String>) -> Result<T, Rejection> {
-    Err(reject::custom(Error {
-        message: msg.into(),
-        code: StatusCode::INTERNAL_SERVER_ERROR,
-    }))
-}
-
-pub fn not_found<T>(msg: impl Into<String>) -> Result<T, Rejection> {
-    Err(reject::custom(Error {
-        message: msg.into(),
-        code: StatusCode::NOT_FOUND,
-    }))
-}
-
-pub fn conflict<T>(msg: impl Into<String>) -> Result<T, Rejection> {
-    Err(reject::custom(Error {
-        message: msg.into(),
-        code: StatusCode::CONFLICT,
-    }))
-}
-
-pub async fn handle_rejection(r: Rejection) -> Result<impl Reply, Rejection> {
-    trace!("{:?}", r);
+pub(crate) async fn handle_rejection(r: Rejection) -> Result<impl Reply, Rejection> {
     if let Some(err) = r.find::<Error>() {
         let json = warp::reply::json(&ErrorMessage {
             code: err.code.as_u16(),
-            message: err.message.clone(),
+            error: err.error.clone(),
         });
         Ok(warp::reply::with_status(json, err.code))
     } else {
+        error!("{:?}", r);
         Err(r)
     }
 }

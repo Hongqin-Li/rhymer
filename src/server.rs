@@ -12,7 +12,7 @@ use serde_json::{Map, Value};
 use user::{decode_token, ClientToken};
 use warp::{
     body::aggregate,
-    hyper::HeaderMap,
+    hyper::{HeaderMap, Method},
     reject::{self, Reject},
     Buf, Future,
 };
@@ -20,8 +20,8 @@ use warp::{Filter, Rejection};
 
 use crate::{
     database::{Database as _, Mongodb as Database},
-    error,
-    function::{self, FuncMap, Function, HookFunc, HookMap},
+    error, file,
+    function::{self, FileHook, FuncMap, Function, HookFunc, HookMap},
     object::{self, Object},
     user::{self, User, UserKind},
     validator::ClassName,
@@ -30,22 +30,42 @@ use crate::{
 /// Per-request data passed to Rhymer.
 #[derive(Debug, Clone)]
 pub struct Request {
+    /// Headers of user request.
     pub headers: warp::http::HeaderMap,
+    /// Body of user request.
     pub body: Option<Document>,
-
-    // Extracted from headers
+    /// Extracted from headers
     pub user: UserKind,
 }
 
 /// Per-server data passed on to Rhymer.
 #[derive(Clone)]
 pub struct Context {
-    pub config: ServerConfig,
+    /// Server config.
+    pub config: Config,
+
+    /// Database connection instance.
     pub db: Database,
+
+    /// Before save hook functions.
     pub before_save: HookMap,
+    /// After save hook functions.
     pub after_save: HookMap,
+    /// Before destroy hook functions.
     pub before_destroy: HookMap,
+    /// After destory hook functions.
     pub after_destroy: HookMap,
+
+    /// Function to trigger before saving a file.
+    pub before_save_file: Option<FileHook>,
+    /// Function to trigger after saving a file.
+    pub after_save_file: Option<FileHook>,
+    /// Function to trigger before deleting a file.
+    pub before_delete_file: Option<FileHook>,
+    /// Function to trigger after deleting a file.
+    pub after_delete_file: Option<FileHook>,
+
+    /// Functions.
     pub function: FuncMap,
 }
 
@@ -76,65 +96,91 @@ fn with_context(
     warp::any().map(move || ctx.clone())
 }
 
-fn parse_user(headers: &HeaderMap, key: &str) -> UserKind {
-    let token = headers
-        .get("X-Parse-Session-Token")
-        .map_or(None, |h| h.to_str().map_or(None, |s| decode_token(s, &key)));
-    let master = headers.get("X-Parse-Master-Key").map_or(false, |k| {
+fn parse_user(headers: &HeaderMap, key: &str) -> Result<UserKind, Rejection> {
+    let hdr_token = headers
+        .get("x-parse-session-token")
+        .map_or(None, |h| h.to_str().map_or(None, |s| Some(s)));
+
+    let token = if let Some(s) = hdr_token {
+        Some(decode_token(s, &key)?)
+    } else {
+        None
+    };
+    let master = headers.get("x-parse-master-key").map_or(false, |k| {
         k.to_str()
             .map_or(false, |k| if k == key { true } else { false })
     });
+    trace!("header: {:?}", headers);
 
-    if master {
+    Ok(if master {
         UserKind::Master
     } else if let Some(t) = token {
         UserKind::Client(t)
     } else {
         UserKind::Guest
-    }
+    })
 }
 
 fn with_req(
     key: impl Into<String>,
+    body_limit: u64,
 ) -> impl Filter<Extract = (Request,), Error = Rejection> + Clone {
     let key: String = key.into();
-    warp::header::headers_cloned().and(warp::body::json()).map(
-        move |headers: HeaderMap, body: Map<String, Value>| {
-            // See https://github.com/mongodb/bson-rust/issues/189
-            let body = Document::try_from(body).map_or_else(
-                |e| {
-                    warn!("request body deserialized failed");
-                    None
-                },
-                |d| Some(d),
-            );
-            let user = parse_user(&headers, &key);
-            Request {
-                headers,
-                body,
-                user,
-            }
-        },
-    )
+    warp::header::headers_cloned()
+        .and(warp::body::content_length_limit(body_limit))
+        .and(
+            warp::body::json()
+                .map(move |body: Map<String, Value>| {
+                    // See https://github.com/mongodb/bson-rust/issues/189
+                    let body = Document::try_from(body).map_or_else(
+                        |e| {
+                            warn!("request body deserialized failed");
+                            None
+                        },
+                        |d| Some(d),
+                    );
+                    body
+                })
+                .or(warp::any().map(|| None))
+                .unify(),
+        )
+        .and(warp::any().map(move || key.clone()))
+        .and_then(
+            async move |headers: HeaderMap,
+                        body: Option<Document>,
+                        key: String|
+                        -> Result<Request, Rejection> {
+                let user = parse_user(&headers, &key)?;
+                Ok(Request {
+                    headers,
+                    body,
+                    user,
+                })
+            },
+        )
 }
 
 fn with_req_without_body(
     key: impl Into<String>,
-) -> impl Filter<Extract = (Request,), Error = Infallible> + Clone {
+) -> impl Filter<Extract = (Request,), Error = Rejection> + Clone {
     let key: String = key.into();
-    warp::header::headers_cloned().map(move |headers: HeaderMap| {
-        let user = parse_user(&headers, &key);
-        Request {
-            headers,
-            body: None,
-            user,
-        }
-    })
+    warp::header::headers_cloned()
+        .and(warp::any().map(move || key.clone()))
+        .and_then(
+            async move |headers: HeaderMap, key: String| -> Result<Request, Rejection> {
+                let user = parse_user(&headers, &key)?;
+                Ok(Request {
+                    headers,
+                    body: None,
+                    user,
+                })
+            },
+        )
 }
 
 /// Server configuration
 #[derive(Debug, Clone, Default)]
-pub struct ServerConfig {
+pub struct Config {
     /// port
     pub port: u16,
 
@@ -144,6 +190,11 @@ pub struct ServerConfig {
     /// MongoDB url of form `mongodb://USERNAME:PASSWORD@localhost:27017/DATABASE_NAME`
     pub database_url: String,
 
+    /// Url of this server.
+    ///
+    /// This url will be used to generated links for uploaded files.
+    pub server_url: String,
+
     /// Maximum legal body size in bytes.
     pub body_limit: u64,
 }
@@ -151,17 +202,21 @@ pub struct ServerConfig {
 /// The server
 #[derive(Clone, Default)]
 pub struct Server {
-    config: ServerConfig,
+    config: Config,
     before_save: HookMap,
     after_save: HookMap,
     before_destroy: HookMap,
     after_destroy: HookMap,
+    before_save_file: Option<FileHook>,
+    after_save_file: Option<FileHook>,
+    before_delete_file: Option<FileHook>,
+    after_delete_file: Option<FileHook>,
     function: FuncMap,
 }
 
 impl Server {
     /// Create a server from option
-    pub async fn from_option(config: ServerConfig) -> Self {
+    pub async fn from_option(config: Config) -> Self {
         Self {
             config,
             ..Server::default()
@@ -185,6 +240,23 @@ impl Server {
         self.after_destroy.insert(class_name.into(), f);
     }
 
+    /// Register a hook function triggered before saving a file.
+    pub fn before_save_file(&mut self, f: FileHook) {
+        self.before_save_file = Some(f);
+    }
+    /// Register a hook function triggered after saving a file.
+    pub fn after_save_file(&mut self, f: FileHook) {
+        self.after_save_file = Some(f);
+    }
+    /// Register a hook function triggered before deleting a file.
+    pub fn before_delete_file(&mut self, f: FileHook) {
+        self.before_delete_file = Some(f);
+    }
+    /// Register a hook function triggered after deleting a file.
+    pub fn after_delete_file(&mut self, f: FileHook) {
+        self.after_delete_file = Some(f);
+    }
+
     /// Register a function to be invoked by api.
     pub fn define(&mut self, name: impl Into<String>, f: Function) {
         self.function.insert(name.into(), f);
@@ -192,7 +264,7 @@ impl Server {
 
     /// Warp's filters for routing.
     pub async fn routes(
-        &mut self,
+        &self,
     ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
         let context = Arc::new(Context {
             db: Database::from_url(self.config.database_url.clone()).await,
@@ -201,6 +273,10 @@ impl Server {
             after_save: self.after_save.clone(),
             before_destroy: self.before_destroy.clone(),
             after_destroy: self.after_destroy.clone(),
+            before_save_file: self.before_save_file.clone(),
+            after_save_file: self.after_save_file.clone(),
+            before_delete_file: self.before_delete_file.clone(),
+            after_delete_file: self.after_delete_file.clone(),
             function: self.function.clone(),
         });
 
@@ -218,7 +294,7 @@ impl Server {
             ($($e:expr), *) => {
                 warp::post()
                     $(.and($e))*
-                    .and(with_req(self.config.secret.clone()))
+                    .and(with_req(self.config.secret.clone(), self.config.body_limit))
                     .and(with_context(context.clone()));
             }
         }
@@ -227,7 +303,7 @@ impl Server {
             ($($e:expr), *) => {
                 warp::put()
                     $(.and($e))*
-                    .and(with_req(self.config.secret.clone()))
+                    .and(with_req(self.config.secret.clone(), self.config.body_limit))
                     .and(with_context(context.clone()));
             }
         }
@@ -268,10 +344,38 @@ impl Server {
         let function_route =
             get!(warp::path!("functions" / String), warp::query()).and_then(function::run);
 
+        // Upload file by application/x-www-form-urlencoded
+        let create_file = warp::post()
+            .and(warp::path!("files" / String))
+            .and(warp::body::content_length_limit(self.config.body_limit))
+            .and(warp::body::bytes())
+            .and(with_req_without_body(self.config.secret.clone()))
+            .and(with_context(context.clone()))
+            .and_then(file::create);
+
+        let retrieve_file =
+            get!(warp::path("files"), warp::fs::dir("./files")).and_then(file::retrieve);
+
+        let delete_file = delete!(warp::path!("files" / String / String)).and_then(file::delete);
+
+        let file_routes = retrieve_file.or(create_file).or(delete_file);
+
+        let cors = warp::cors()
+            .allow_any_origin()
+            .allow_headers(vec![
+                "Content-Type",
+                "X-Parse-Application-Id",
+                "X-Parse-Revocable-Session",
+                "X-Parse-Session-Token",
+            ])
+            .allow_methods(&[Method::GET, Method::POST, Method::DELETE, Method::PUT]);
+
         let routes = user_routes
             .or(object_routes)
             .or(function_route)
-            .recover(error::handle_rejection);
+            .or(file_routes)
+            .recover(error::handle_rejection)
+            .with(cors);
 
         routes
     }
