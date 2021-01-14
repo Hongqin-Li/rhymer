@@ -1,21 +1,12 @@
 use std::{
-    collections::HashMap,
     convert::{Infallible, TryFrom},
-    pin::Pin,
-    sync::{Arc, Mutex},
+    sync::Arc,
 };
 
-use error::{bad_request, internal_server_error};
 use mongodb::bson::Document;
-use serde::{de::DeserializeOwned, private::de::IdentifierDeserializer};
 use serde_json::{Map, Value};
-use user::{decode_token, ClientToken};
-use warp::{
-    body::aggregate,
-    hyper::{HeaderMap, Method},
-    reject::{self, Reject},
-    Buf, Future,
-};
+use user::decode_token;
+use warp::hyper::{HeaderMap, Method};
 use warp::{Filter, Rejection};
 
 use crate::{
