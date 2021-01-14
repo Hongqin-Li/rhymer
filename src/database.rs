@@ -248,6 +248,7 @@ impl Database for Mongodb {
         user: UserKind,
     ) -> Result<Document, Rejection> {
         let req_doc = doc.clone();
+        doc.remove(OBJECT_ID); // Remove it since `objectId` is mapped onto `_id`.
         match user {
             UserKind::Master => {
                 // Master can update with any document
@@ -256,9 +257,6 @@ impl Database for Mongodb {
                 // Client and Guest cannot update ACL and objectId
                 if let Some(x) = doc.remove(ACL) {
                     return bad_request("Cannot update ACL");
-                }
-                if let Some(x) = doc.remove(OBJECT_ID) {
-                    return bad_request("Cannot update objectId");
                 }
             }
         }

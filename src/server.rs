@@ -1,4 +1,5 @@
 use std::{
+    collections::HashMap,
     convert::{Infallible, TryFrom},
     sync::Arc,
 };
@@ -73,6 +74,13 @@ impl Context {
         let mut obj = Object::from(self, UserKind::Master);
         obj.set_class(class);
         obj
+    }
+
+    /// Create a user instance by id.
+    pub fn user(self: Arc<Self>, id: impl Into<String>) -> User {
+        let mut u = User::with_context(self);
+        u.set_id(id);
+        u
     }
 
     /// Run a function by name.
@@ -332,8 +340,22 @@ impl Server {
             .or(update)
             .or(delete);
 
-        let function_route =
+        let get_function =
             get!(warp::path!("functions" / String), warp::query()).and_then(function::run);
+
+        let post_function = warp::post()
+            .and(warp::path!("functions" / String))
+            .and(warp::body::content_length_limit(self.config.body_limit))
+            .and(
+                warp::body::json()
+                    .or(warp::any().map(|| HashMap::default()))
+                    .unify(),
+            )
+            .and(with_req_without_body(self.config.secret.clone()))
+            .and(with_context(context.clone()))
+            .and_then(function::run_post);
+
+        let function_route = get_function.or(post_function);
 
         // Upload file by application/x-www-form-urlencoded
         let create_file = warp::post()

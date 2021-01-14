@@ -7,7 +7,7 @@ use crate::{
     validator::{UserName, UserPassword},
 };
 use error::bad_request;
-use mongodb::bson::{doc, Document};
+use mongodb::bson::{doc, Bson, Document};
 use serde::{Deserialize, Serialize};
 use warp::{Rejection, Reply};
 
@@ -41,6 +41,7 @@ pub enum UserKind {
 /// User instance.
 #[derive(Clone)]
 pub struct User {
+    data: Document,
     kind: UserKind,
     ctx: Arc<Context>,
 }
@@ -49,8 +50,39 @@ impl User {
     /// Create a user instance with server context.
     pub fn with_context(ctx: Arc<Context>) -> Self {
         User {
+            data: Document::default(),
             kind: UserKind::Guest,
             ctx,
+        }
+    }
+
+    /// Set Id of this user, which may be used by `save` without logging in.
+    pub fn set_id(&mut self, uid: impl Into<String>) {
+        let uid: String = uid.into();
+        let t = ClientToken {
+            sub: uid.clone(),
+            id: uid.clone(),
+            name: "$UNKNOWN".into(),
+            exp: 0,
+        };
+        self.kind = UserKind::Client(t);
+    }
+
+    /// Set value by key of data of this user.
+    pub fn set(&mut self, key: impl Into<String>, value: impl Into<Bson>) {
+        self.data.insert(key, value);
+    }
+
+    /// Save current user's data.
+    pub async fn save(&self) -> Result<Document, Rejection> {
+        if let UserKind::Client(ref t) = self.kind {
+            let result = (*self.ctx)
+                .db
+                .update("_User", &t.id, self.data.clone(), UserKind::Master)
+                .await?;
+            Ok(result)
+        } else {
+            unauthorized("Please login first")
         }
     }
 
@@ -86,13 +118,16 @@ impl User {
     ) -> Result<(Document, ClientToken), Rejection> {
         let filter = doc! {"username": name, "password": pwd};
         trace!("login filter: {:?}", filter);
-        let mut v = self
+        let v = self
             .ctx
             .db
             .retrieve("_User", filter, UserKind::Master)
             .await?;
 
         if let Some(d) = v.first() {
+            if v.len() != 1 {
+                return internal_server_error("User ID not unique");
+            }
             let id = d.get_str(database::OBJECT_ID).unwrap().to_string();
             let token = ClientToken {
                 sub: id.clone(),
@@ -100,6 +135,7 @@ impl User {
                 id,
                 name: name.to_owned(),
             };
+            self.data = d.clone();
             self.kind = UserKind::Client(token.clone());
             Ok((d.to_owned(), token))
         } else {

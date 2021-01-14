@@ -14,7 +14,7 @@ use warp::{Rejection, Reply};
 pub struct Object {
     class: String,
     id: Option<String>,
-    doc: Document,
+    pub data: Document,
     acl: Acl,
     ctx: Arc<Context>,
     user: UserKind,
@@ -27,7 +27,7 @@ impl Object {
             user,
             id: None,
             class: "".to_string(),
-            doc: Document::default(),
+            data: Document::default(),
             acl: Acl::default(),
         }
     }
@@ -39,7 +39,7 @@ impl Object {
         self.id = Some(id.into());
     }
     pub fn set_doc(&mut self, doc: Document) {
-        self.doc = doc;
+        self.data = doc;
     }
 
     pub fn set_acl(&mut self, acl: Acl) {
@@ -49,9 +49,36 @@ impl Object {
         self.acl.clone()
     }
 
+    /// Retrieve data from database by id.
+    pub async fn get(&mut self, id: impl Into<String>) -> Result<Document, Rejection> {
+        let id: String = id.into();
+
+        let filter = doc! {database::OBJECT_ID: &id };
+        let result = (*self.ctx)
+            .db
+            .retrieve(&self.class, filter, self.user.clone())
+            .await;
+        result.map_or_else(
+            |e| Err(e),
+            |v| {
+                if let Some(v) = v.first() {
+                    self.data = v.clone();
+                    self.id = Some(id);
+                    Ok(v.to_owned())
+                // serde_json::to_string(v)
+                //     .map_or_else(|_e| internal_server_error("Serialization error"), |s| Ok(s))
+                } else if v.len() == 0 {
+                    not_found("Object not found")
+                } else {
+                    internal_server_error("Id not unique")
+                }
+            },
+        )
+    }
+
     /// Update if id is provided, else create a new one.
     pub async fn save(&mut self) -> Result<Document, Rejection> {
-        let mut doc = self.doc.clone();
+        let mut doc = self.data.clone();
 
         match self.user {
             // Only Master can modify ACL.
@@ -259,6 +286,14 @@ mod test {
                 .await
         };
 
+        let retrieve1_all = async move |api, class| {
+            warp::test::request()
+                .method("GET")
+                .path(&format!("/classes/{}", class))
+                .reply(api)
+                .await
+        };
+
         let update1 = async move |api, class, id, body| {
             warp::test::request()
                 .method("PUT")
@@ -388,6 +423,13 @@ mod test {
         assert_eq!(body.get_str("createdAt").unwrap(), created_at);
         assert_eq!(body.get_i32("newField").unwrap(), 1);
         assert!(dbg!(body.get_str("updatedAt").unwrap()) > dbg!(updated_at));
+
+        // Retrieve all.
+        let resp = retrieve1_all(&api, "foo").await;
+        let body = Value::try_from(serde_json::from_slice::<Vec<Value>>(&resp.body()[..]).unwrap())
+            .unwrap();
+        let v = body.as_array().unwrap();
+        assert_eq!(v.len(), 2);
 
         // Test delete non-exist object.
         let resp = delete1(&api, "foo", "xxx").await;

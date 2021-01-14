@@ -38,8 +38,6 @@ mod tests {
 
     pub const TEST_SERVER_KEY: &str = "xxx";
 
-    pub const TEST_USER_ID: &str = "id";
-
     /// Helper macro for testing requests that requires user login.
     #[macro_export]
     macro_rules! with_user {

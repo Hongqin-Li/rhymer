@@ -121,12 +121,14 @@ pub async fn create(
         ctx.clone(),
     );
     if let Some(f) = &ctx.before_save_file {
+        trace!("before save file: {}", file.file_name);
         file = f(file, req.clone(), ctx.clone()).await?;
     }
 
     file.save().await?;
 
     if let Some(f) = &ctx.after_save_file {
+        trace!("after save file: {}", file.file_name);
         file = f(file, req, ctx.clone()).await?;
     }
 
@@ -166,6 +168,7 @@ pub async fn delete(
             ctx.clone(),
         );
         if let Some(f) = &ctx.before_delete_file {
+            trace!("before destroy file: {}", file.file_name);
             file = f(file, req.clone(), ctx.clone()).await?;
         }
         // Delete
@@ -176,6 +179,7 @@ pub async fn delete(
         fs::remove_file(&path).map_or_else(|e| not_found("Failed to remove file"), |s| Ok(s))?;
 
         if let Some(f) = &ctx.after_delete_file {
+            trace!("after destroy file: {}", file.file_name);
             f(file, req.clone(), ctx.clone()).await?;
         }
         Ok("")

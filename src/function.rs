@@ -45,6 +45,20 @@ pub async fn run(
     }
 }
 
+pub async fn run_post(
+    name: String,
+    arg: HashMap<String, String>,
+    req: Request,
+    ctx: Arc<Context>,
+) -> Result<impl Reply, Rejection> {
+    if let Some(f) = ctx.function.get(&name) {
+        trace!("run function '{}', args {:?}", name, arg.clone());
+        f(req, ctx.clone(), arg).await
+    } else {
+        not_found(format!("function '{}' not found", name))
+    }
+}
+
 #[cfg(test)]
 mod test {
     use std::{
@@ -268,9 +282,22 @@ mod test {
                 .reply(api)
                 .await
         };
+        let invoke1_post = async move |api, name, query| {
+            warp::test::request()
+                .method("POST")
+                .path(&format!("/functions/{}", name))
+                .body(&query)
+                .reply(api)
+                .await
+        };
+
         let resp = invoke1(&api, "xxx", "").await;
         assert_eq!(resp.status(), StatusCode::NOT_FOUND);
         let resp = invoke1(&api, "foo", "a=1&bar=2").await;
+        assert_eq!(resp.status(), StatusCode::OK);
+        assert_eq!(String::from_utf8(resp.body()[..].to_vec()).unwrap(), "2");
+
+        let resp = invoke1_post(&api, "foo", json!({"bar": "2"}).to_string()).await;
         assert_eq!(resp.status(), StatusCode::OK);
         assert_eq!(String::from_utf8(resp.body()[..].to_vec()).unwrap(), "2");
     }
