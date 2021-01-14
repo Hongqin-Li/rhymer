@@ -1,3 +1,3 @@
 (function() {var implementors = {};
-implementors["rhymer"] = [{"text":"impl Default for ServerConfig","synthetic":false,"types":[]},{"text":"impl Default for Server","synthetic":false,"types":[]}];
+implementors["rhymer"] = [{"text":"impl Default for Acl","synthetic":false,"types":[]},{"text":"impl Default for Config","synthetic":false,"types":[]},{"text":"impl Default for Server","synthetic":false,"types":[]},{"text":"impl Default for ClientToken","synthetic":false,"types":[]}];
 if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

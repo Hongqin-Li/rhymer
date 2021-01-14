@@ -1,3 +1,3 @@
 (function() {var implementors = {};
-implementors["rhymer"] = [{"text":"impl Clone for ServerConfig","synthetic":false,"types":[]},{"text":"impl Clone for Server","synthetic":false,"types":[]}];
+implementors["rhymer"] = [{"text":"impl Clone for Acl","synthetic":false,"types":[]},{"text":"impl Clone for Request","synthetic":false,"types":[]},{"text":"impl Clone for Context","synthetic":false,"types":[]},{"text":"impl Clone for Config","synthetic":false,"types":[]},{"text":"impl Clone for Server","synthetic":false,"types":[]},{"text":"impl Clone for ClientToken","synthetic":false,"types":[]},{"text":"impl Clone for UserKind","synthetic":false,"types":[]},{"text":"impl Clone for User","synthetic":false,"types":[]}];
 if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

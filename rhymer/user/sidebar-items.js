@@ -1,0 +1,1 @@
+initSidebarItems({"enum":[["UserKind","User kinds."]],"fn":[["decode_token","Decode token string `s` by key."],["encode_token","Encode a token struct `t` by key."]],"struct":[["ClientToken","JWT token of a verified user."],["LoginQuery","Login query struct."],["User","User instance."]]});

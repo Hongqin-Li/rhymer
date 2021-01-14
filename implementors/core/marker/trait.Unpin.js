@@ -1,3 +1,3 @@
 (function() {var implementors = {};
-implementors["rhymer"] = [{"text":"impl Unpin for Server","synthetic":true,"types":[]},{"text":"impl Unpin for ServerConfig","synthetic":true,"types":[]}];
+implementors["rhymer"] = [{"text":"impl Unpin for Acl","synthetic":true,"types":[]},{"text":"impl Unpin for File","synthetic":true,"types":[]},{"text":"impl Unpin for Config","synthetic":true,"types":[]},{"text":"impl Unpin for Context","synthetic":true,"types":[]},{"text":"impl Unpin for Request","synthetic":true,"types":[]},{"text":"impl Unpin for Server","synthetic":true,"types":[]},{"text":"impl Unpin for ClientToken","synthetic":true,"types":[]},{"text":"impl Unpin for User","synthetic":true,"types":[]},{"text":"impl Unpin for LoginQuery","synthetic":true,"types":[]},{"text":"impl Unpin for UserKind","synthetic":true,"types":[]}];
 if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()
