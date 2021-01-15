@@ -1,18 +1,15 @@
-<div align="center">
-    <h1 style="border-bottom: none;">
-    Rhymer
-    </h1>
-    <p>An open source backend-as-a-service library in Rust</p>
-    <p>
-      <a href="../../actions"><img src="../../workflows/CI/badge.svg" alt="CI Status" style="max-width:100%;"></a>
-      <a href="../../actions"><img src="../../workflows/Deploy/badge.svg" alt="Deploy Status" style="max-width:100%;"></a>
-      <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License" style="max-width:100%;"></a>
-    </p>
-</div>
+<h1 align="center">
+    Rhymer<br/>
+    <a href="../../actions"><img src="../../workflows/CI/badge.svg" alt="CI Status" style="max-width:100%;"></a>
+    <a href="../../actions"><img src="../../workflows/Deploy/badge.svg" alt="Deploy Status" style="max-width:100%;"></a>
+    <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License" style="max-width:100%;"></a>
+</h1>
 
-<hr/>
+<p align="center">An open source backend-as-a-service library in Rust</p>
 
-This is an API server module in Rust using [warp](https://github.com/seanmonstar/warp) and [MongoDB](https://github.com/mongodb/mongo-rust-driver), motivated by [Parse Server](https://parseplatform.org/).
+<br/><br/>
+
+This is an API server module in Rust using [warp](https://github.com/seanmonstar/warp) and [MongoDB](https://github.com/mongodb/mongo-rust-driver), motivated by [Parse Server](https://parseplatform.org/). Still work-in-progress.
 
 - [x] (Tested) User login/signup/update
 - [x] (Tested) Object CRUD
@@ -28,22 +25,28 @@ This is an API server module in Rust using [warp](https://github.com/seanmonstar
 
 ## Getting Started
 
-### Running Rhymer
+Make sure you have the following components installed.
 
+- Rust toolchains
+- MongoDB Server
 
+Then add to your `Cargo.toml`
+
+```toml
+rhymer = { git = "https://github.com/Hongqin-Li/rhymer" }
+```
+
+See examples or [documentation](https://hongqin-li.github.io/rhymer/rhymer/index.html) for details.
 
 ### Configuration
 
+The Rhymer server can be configured by the following options.
 
-
-
-
-## Example
-
-OpenBaaS example.
-
-- [x] User login/signup
-- [x] Page module
+- `port` Port to listen on by the server.
+- `secret` The Master key used to generate session tokens, **keep it as secret as possible**.
+- `database_url` URL to MongoDB server including the database name, user name and password.
+- `server_url` URL to this server, used to generate URL for uploaded files.
+- `body_limit` Maximum number of bytes of body of request from client.
 
 
 
