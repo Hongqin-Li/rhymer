@@ -406,6 +406,10 @@
 <span id="403">403</span>
 <span id="404">404</span>
 <span id="405">405</span>
+<span id="406">406</span>
+<span id="407">407</span>
+<span id="408">408</span>
+<span id="409">409</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="ident">std</span>::{
     <span class="ident">collections</span>::<span class="ident">HashMap</span>,
@@ -726,14 +730,15 @@
         }
 
         <span class="comment">// Be careful about the order to avoid consuming request body multiple times.</span>
+        <span class="comment">// warp::path! matches for end, while warp::patn doesn&#39;t.</span>
         <span class="kw">let</span> <span class="ident">update_user</span> <span class="op">=</span> <span class="macro">post</span><span class="macro">!</span>(<span class="ident">warp</span>::<span class="macro">path</span><span class="macro">!</span>(<span class="string">&quot;users&quot;</span> <span class="op">/</span> <span class="ident">String</span>)).<span class="ident">and_then</span>(<span class="ident">user</span>::<span class="ident">update</span>);
 
-        <span class="kw">let</span> <span class="ident">signup</span> <span class="op">=</span> <span class="macro">post</span><span class="macro">!</span>(<span class="ident">warp</span>::<span class="ident">path</span>(<span class="string">&quot;users&quot;</span>)).<span class="ident">and_then</span>(<span class="ident">user</span>::<span class="ident">signup</span>);
+        <span class="kw">let</span> <span class="ident">signup</span> <span class="op">=</span> <span class="macro">post</span><span class="macro">!</span>(<span class="ident">warp</span>::<span class="macro">path</span><span class="macro">!</span>(<span class="string">&quot;users&quot;</span>)).<span class="ident">and_then</span>(<span class="ident">user</span>::<span class="ident">signup</span>);
 
         <span class="kw">let</span> <span class="ident">login</span> <span class="op">=</span>
             <span class="macro">get</span><span class="macro">!</span>(<span class="ident">warp</span>::<span class="ident">path</span>(<span class="string">&quot;login&quot;</span>), <span class="ident">warp</span>::<span class="ident">query</span>::<span class="op">&lt;</span><span class="ident">user</span>::<span class="ident">LoginQuery</span><span class="op">&gt;</span>()).<span class="ident">and_then</span>(<span class="ident">user</span>::<span class="ident">login</span>);
 
-        <span class="kw">let</span> <span class="ident">user_routes</span> <span class="op">=</span> <span class="ident">update_user</span>.<span class="ident">or</span>(<span class="ident">signup</span>).<span class="ident">or</span>(<span class="ident">login</span>);
+        <span class="kw">let</span> <span class="ident">user_routes</span> <span class="op">=</span> <span class="ident">signup</span>.<span class="ident">or</span>(<span class="ident">update_user</span>).<span class="ident">or</span>(<span class="ident">login</span>);
 
         <span class="kw">let</span> <span class="ident">create</span> <span class="op">=</span> <span class="macro">post</span><span class="macro">!</span>(<span class="ident">warp</span>::<span class="macro">path</span><span class="macro">!</span>(<span class="string">&quot;classes&quot;</span> <span class="op">/</span> <span class="ident">ClassName</span>)).<span class="ident">and_then</span>(<span class="ident">object</span>::<span class="ident">create</span>);
 
@@ -760,7 +765,10 @@
             .<span class="ident">and</span>(<span class="ident">warp</span>::<span class="ident">body</span>::<span class="ident">content_length_limit</span>(<span class="self">self</span>.<span class="ident">config</span>.<span class="ident">body_limit</span>))
             .<span class="ident">and</span>(
                 <span class="ident">warp</span>::<span class="ident">body</span>::<span class="ident">json</span>()
-                    .<span class="ident">or</span>(<span class="ident">warp</span>::<span class="ident">any</span>().<span class="ident">map</span>(<span class="op">|</span><span class="op">|</span> <span class="ident">HashMap</span>::<span class="ident">default</span>()))
+                    .<span class="ident">or</span>(<span class="ident">warp</span>::<span class="ident">any</span>().<span class="ident">map</span>(<span class="op">|</span><span class="op">|</span> {
+                        <span class="macro">warn</span><span class="macro">!</span>(<span class="string">&quot;post function: request body invalid, default to empty arguments&quot;</span>);
+                        <span class="ident">HashMap</span>::<span class="ident">default</span>()
+                    }))
                     .<span class="ident">unify</span>(),
             )
             .<span class="ident">and</span>(<span class="ident">with_req_without_body</span>(<span class="self">self</span>.<span class="ident">config</span>.<span class="ident">secret</span>.<span class="ident">clone</span>()))

@@ -712,14 +712,14 @@
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">pwd</span> <span class="op">=</span> <span class="prelude-val">None</span>;
         <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Ok</span>(<span class="ident">s</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">data</span>.<span class="ident">get_str</span>(<span class="self">Self</span>::<span class="ident">NAME</span>) {
             <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">s</span>) <span class="op">=</span> <span class="ident">s</span>.<span class="ident">to_string</span>().<span class="ident">parse</span>::<span class="op">&lt;</span><span class="ident">UserName</span><span class="op">&gt;</span>() {
-                <span class="kw">return</span> <span class="ident">bad_request</span>(<span class="string">&quot;Cannot update with invalid username&quot;</span>);
+                <span class="kw">return</span> <span class="ident">bad_request</span>(<span class="string">&quot;Invalid username&quot;</span>);
             } <span class="kw">else</span> {
                 <span class="ident">name</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">s</span>);
             }
         };
         <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Ok</span>(<span class="ident">s</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">data</span>.<span class="ident">get_str</span>(<span class="self">Self</span>::<span class="ident">PWD</span>) {
             <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">s</span>) <span class="op">=</span> <span class="ident">s</span>.<span class="ident">to_string</span>().<span class="ident">parse</span>::<span class="op">&lt;</span><span class="ident">UserPassword</span><span class="op">&gt;</span>() {
-                <span class="kw">return</span> <span class="ident">bad_request</span>(<span class="string">&quot;Cannot update with invalid password&quot;</span>);
+                <span class="kw">return</span> <span class="ident">bad_request</span>(<span class="string">&quot;Invalid password&quot;</span>);
             } <span class="kw">else</span> {
                 <span class="ident">pwd</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">s</span>)
             }

@@ -305,6 +305,29 @@
 <span id="302">302</span>
 <span id="303">303</span>
 <span id="304">304</span>
+<span id="305">305</span>
+<span id="306">306</span>
+<span id="307">307</span>
+<span id="308">308</span>
+<span id="309">309</span>
+<span id="310">310</span>
+<span id="311">311</span>
+<span id="312">312</span>
+<span id="313">313</span>
+<span id="314">314</span>
+<span id="315">315</span>
+<span id="316">316</span>
+<span id="317">317</span>
+<span id="318">318</span>
+<span id="319">319</span>
+<span id="320">320</span>
+<span id="321">321</span>
+<span id="322">322</span>
+<span id="323">323</span>
+<span id="324">324</span>
+<span id="325">325</span>
+<span id="326">326</span>
+<span id="327">327</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="ident">std</span>::{<span class="ident">collections</span>::<span class="ident">HashMap</span>, <span class="ident">pin</span>::<span class="ident">Pin</span>, <span class="ident">sync</span>::<span class="ident">Arc</span>};
 
@@ -601,11 +624,34 @@
 
         <span class="kw">let</span> <span class="ident">resp</span> <span class="op">=</span> <span class="ident">invoke1</span>(<span class="kw-2">&amp;</span><span class="ident">api</span>, <span class="string">&quot;xxx&quot;</span>, <span class="string">&quot;&quot;</span>).<span class="ident">await</span>;
         <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">resp</span>.<span class="ident">status</span>(), <span class="ident">StatusCode</span>::<span class="ident">NOT_FOUND</span>);
+
+        <span class="comment">// Test get function without body.</span>
+        <span class="kw">let</span> <span class="ident">resp</span> <span class="op">=</span> <span class="ident">invoke1</span>(<span class="kw-2">&amp;</span><span class="ident">api</span>, <span class="string">&quot;foo&quot;</span>, <span class="string">&quot;&quot;</span>).<span class="ident">await</span>;
+        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">resp</span>.<span class="ident">status</span>(), <span class="ident">StatusCode</span>::<span class="ident">OK</span>);
+        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">String</span>::<span class="ident">from_utf8</span>(<span class="ident">resp</span>.<span class="ident">body</span>()[..].<span class="ident">to_vec</span>()).<span class="ident">unwrap</span>(), <span class="string">&quot;none&quot;</span>);
+
+        <span class="comment">// Test get function with invalid body should default to no arguments.</span>
+        <span class="kw">let</span> <span class="ident">resp</span> <span class="op">=</span> <span class="ident">invoke1</span>(<span class="kw-2">&amp;</span><span class="ident">api</span>, <span class="string">&quot;foo&quot;</span>, <span class="string">&quot;aa1.xxx&quot;</span>).<span class="ident">await</span>;
+        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">resp</span>.<span class="ident">status</span>(), <span class="ident">StatusCode</span>::<span class="ident">OK</span>);
+        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">String</span>::<span class="ident">from_utf8</span>(<span class="ident">resp</span>.<span class="ident">body</span>()[..].<span class="ident">to_vec</span>()).<span class="ident">unwrap</span>(), <span class="string">&quot;none&quot;</span>);
+
+        <span class="comment">// Test get function with body.</span>
         <span class="kw">let</span> <span class="ident">resp</span> <span class="op">=</span> <span class="ident">invoke1</span>(<span class="kw-2">&amp;</span><span class="ident">api</span>, <span class="string">&quot;foo&quot;</span>, <span class="string">&quot;a=1&amp;bar=2&quot;</span>).<span class="ident">await</span>;
         <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">resp</span>.<span class="ident">status</span>(), <span class="ident">StatusCode</span>::<span class="ident">OK</span>);
         <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">String</span>::<span class="ident">from_utf8</span>(<span class="ident">resp</span>.<span class="ident">body</span>()[..].<span class="ident">to_vec</span>()).<span class="ident">unwrap</span>(), <span class="string">&quot;2&quot;</span>);
 
-        <span class="kw">let</span> <span class="ident">resp</span> <span class="op">=</span> <span class="ident">invoke1_post</span>(<span class="kw-2">&amp;</span><span class="ident">api</span>, <span class="string">&quot;foo&quot;</span>, <span class="macro">json</span><span class="macro">!</span>({<span class="string">&quot;bar&quot;</span>: <span class="string">&quot;2&quot;</span>}).<span class="ident">to_string</span>()).<span class="ident">await</span>;
+        <span class="comment">// Test post function without body.</span>
+        <span class="kw">let</span> <span class="ident">resp</span> <span class="op">=</span> <span class="ident">invoke1_post</span>(<span class="kw-2">&amp;</span><span class="ident">api</span>, <span class="string">&quot;foo&quot;</span>, <span class="string">&quot;&quot;</span>).<span class="ident">await</span>;
+        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">resp</span>.<span class="ident">status</span>(), <span class="ident">StatusCode</span>::<span class="ident">OK</span>);
+        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">String</span>::<span class="ident">from_utf8</span>(<span class="ident">resp</span>.<span class="ident">body</span>()[..].<span class="ident">to_vec</span>()).<span class="ident">unwrap</span>(), <span class="string">&quot;none&quot;</span>);
+
+        <span class="comment">// Test post function with invalid body should default to no arguments.</span>
+        <span class="kw">let</span> <span class="ident">resp</span> <span class="op">=</span> <span class="ident">invoke1_post</span>(<span class="kw-2">&amp;</span><span class="ident">api</span>, <span class="string">&quot;foo&quot;</span>, <span class="string">&quot;{ddd}&quot;</span>).<span class="ident">await</span>;
+        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">resp</span>.<span class="ident">status</span>(), <span class="ident">StatusCode</span>::<span class="ident">OK</span>);
+        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">String</span>::<span class="ident">from_utf8</span>(<span class="ident">resp</span>.<span class="ident">body</span>()[..].<span class="ident">to_vec</span>()).<span class="ident">unwrap</span>(), <span class="string">&quot;none&quot;</span>);
+
+        <span class="comment">// Test post function with body.</span>
+        <span class="kw">let</span> <span class="ident">resp</span> <span class="op">=</span> <span class="ident">invoke1_post</span>(<span class="kw-2">&amp;</span><span class="ident">api</span>, <span class="string">&quot;foo&quot;</span>, <span class="kw-2">&amp;</span><span class="macro">json</span><span class="macro">!</span>({<span class="string">&quot;bar&quot;</span>: <span class="string">&quot;2&quot;</span>}).<span class="ident">to_string</span>()).<span class="ident">await</span>;
         <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">resp</span>.<span class="ident">status</span>(), <span class="ident">StatusCode</span>::<span class="ident">OK</span>);
         <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">String</span>::<span class="ident">from_utf8</span>(<span class="ident">resp</span>.<span class="ident">body</span>()[..].<span class="ident">to_vec</span>()).<span class="ident">unwrap</span>(), <span class="string">&quot;2&quot;</span>);
     }
