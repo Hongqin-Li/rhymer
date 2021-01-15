@@ -293,11 +293,34 @@ mod test {
 
         let resp = invoke1(&api, "xxx", "").await;
         assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+
+        // Test get function without body.
+        let resp = invoke1(&api, "foo", "").await;
+        assert_eq!(resp.status(), StatusCode::OK);
+        assert_eq!(String::from_utf8(resp.body()[..].to_vec()).unwrap(), "none");
+
+        // Test get function with invalid body should default to no arguments.
+        let resp = invoke1(&api, "foo", "aa1.xxx").await;
+        assert_eq!(resp.status(), StatusCode::OK);
+        assert_eq!(String::from_utf8(resp.body()[..].to_vec()).unwrap(), "none");
+
+        // Test get function with body.
         let resp = invoke1(&api, "foo", "a=1&bar=2").await;
         assert_eq!(resp.status(), StatusCode::OK);
         assert_eq!(String::from_utf8(resp.body()[..].to_vec()).unwrap(), "2");
 
-        let resp = invoke1_post(&api, "foo", json!({"bar": "2"}).to_string()).await;
+        // Test post function without body.
+        let resp = invoke1_post(&api, "foo", "").await;
+        assert_eq!(resp.status(), StatusCode::OK);
+        assert_eq!(String::from_utf8(resp.body()[..].to_vec()).unwrap(), "none");
+
+        // Test post function with invalid body should default to no arguments.
+        let resp = invoke1_post(&api, "foo", "{ddd}").await;
+        assert_eq!(resp.status(), StatusCode::OK);
+        assert_eq!(String::from_utf8(resp.body()[..].to_vec()).unwrap(), "none");
+
+        // Test post function with body.
+        let resp = invoke1_post(&api, "foo", &json!({"bar": "2"}).to_string()).await;
         assert_eq!(resp.status(), StatusCode::OK);
         assert_eq!(String::from_utf8(resp.body()[..].to_vec()).unwrap(), "2");
     }

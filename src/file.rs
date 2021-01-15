@@ -13,7 +13,7 @@ use serde_json::json;
 use uuid::Uuid;
 use warp::{hyper::body::Bytes, multipart::FormData, Rejection, Reply};
 
-use crate::error::{internal_server_error, not_found, unauthorized};
+use crate::error::{bad_request, internal_server_error, not_found, unauthorized};
 use crate::{user::UserKind, Context, Request};
 
 /// File instance.
@@ -82,10 +82,7 @@ impl File {
                     .create(true)
                     .write(true)
                     .open(path)
-                    .map_or_else(
-                        |e| internal_server_error("Error when creating file"),
-                        |f| Ok(f),
-                    )?;
+                    .or_else(|e| internal_server_error("Error when creating file"))?;
                 f.write(self.data.as_ref()).map_or_else(
                     |e| internal_server_error("Error when writing to file"),
                     |r| Ok(r),
@@ -114,9 +111,14 @@ pub async fn create(
         req.headers
             .clone()
             .get("x-parse-application-id")
-            .unwrap()
+            .map_or_else(
+                || bad_request("Please provide X-Parse-Application-Id in header"),
+                |v| Ok(v),
+            )?
             .to_str()
-            .unwrap(),
+            .or_else(|_e| {
+                internal_server_error("Expect a string of X-Parse-Application-Id header")
+            })?,
         req.user.clone(),
         ctx.clone(),
     );
@@ -176,7 +178,7 @@ pub async fn delete(
         path.push(appid);
         path.push(name);
 
-        fs::remove_file(&path).map_or_else(|e| not_found("Failed to remove file"), |s| Ok(s))?;
+        fs::remove_file(&path).or_else(|e| not_found("Failed to remove file"))?;
 
         if let Some(f) = &ctx.after_delete_file {
             trace!("after destroy file: {}", file.file_name);

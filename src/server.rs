@@ -317,14 +317,15 @@ impl Server {
         }
 
         // Be careful about the order to avoid consuming request body multiple times.
+        // warp::path! matches for end, while warp::patn doesn't.
         let update_user = post!(warp::path!("users" / String)).and_then(user::update);
 
-        let signup = post!(warp::path("users")).and_then(user::signup);
+        let signup = post!(warp::path!("users")).and_then(user::signup);
 
         let login =
             get!(warp::path("login"), warp::query::<user::LoginQuery>()).and_then(user::login);
 
-        let user_routes = update_user.or(signup).or(login);
+        let user_routes = signup.or(update_user).or(login);
 
         let create = post!(warp::path!("classes" / ClassName)).and_then(object::create);
 
@@ -351,7 +352,10 @@ impl Server {
             .and(warp::body::content_length_limit(self.config.body_limit))
             .and(
                 warp::body::json()
-                    .or(warp::any().map(|| HashMap::default()))
+                    .or(warp::any().map(|| {
+                        warn!("post function: request body invalid, default to empty arguments");
+                        HashMap::default()
+                    }))
                     .unify(),
             )
             .and(with_req_without_body(self.config.secret.clone()))

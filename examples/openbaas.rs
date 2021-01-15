@@ -45,6 +45,7 @@ async fn page_url(
     ctx: Arc<Context>,
     arg: HashMap<String, String>,
 ) -> Result<String, Rejection> {
+    trace!("page_url: arg {:?}", &arg);
     if let Some(uid) = arg.get("uid") {
         let (ns, svc) = (user_namespace(uid), user_image_page(uid));
         let url = external_url(&ns, &svc);

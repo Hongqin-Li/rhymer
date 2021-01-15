@@ -146,14 +146,14 @@ impl ObjectTrait for User {
         let mut pwd = None;
         if let Ok(s) = self.data.get_str(Self::NAME) {
             if let Err(s) = s.to_string().parse::<UserName>() {
-                return bad_request("Cannot update with invalid username");
+                return bad_request("Invalid username");
             } else {
                 name = Some(s);
             }
         };
         if let Ok(s) = self.data.get_str(Self::PWD) {
             if let Err(s) = s.to_string().parse::<UserPassword>() {
-                return bad_request("Cannot update with invalid password");
+                return bad_request("Invalid password");
             } else {
                 pwd = Some(s)
             }
