@@ -443,6 +443,35 @@
 <span id="440">440</span>
 <span id="441">441</span>
 <span id="442">442</span>
+<span id="443">443</span>
+<span id="444">444</span>
+<span id="445">445</span>
+<span id="446">446</span>
+<span id="447">447</span>
+<span id="448">448</span>
+<span id="449">449</span>
+<span id="450">450</span>
+<span id="451">451</span>
+<span id="452">452</span>
+<span id="453">453</span>
+<span id="454">454</span>
+<span id="455">455</span>
+<span id="456">456</span>
+<span id="457">457</span>
+<span id="458">458</span>
+<span id="459">459</span>
+<span id="460">460</span>
+<span id="461">461</span>
+<span id="462">462</span>
+<span id="463">463</span>
+<span id="464">464</span>
+<span id="465">465</span>
+<span id="466">466</span>
+<span id="467">467</span>
+<span id="468">468</span>
+<span id="469">469</span>
+<span id="470">470</span>
+<span id="471">471</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="kw">crate</span>::{
     <span class="ident">acl</span>::<span class="ident">Acl</span>,
@@ -457,17 +486,55 @@
 <span class="kw">use</span> <span class="ident">std</span>::{<span class="ident">result</span>::<span class="prelude-ty">Result</span>, <span class="ident">sync</span>::<span class="ident">Arc</span>};
 <span class="kw">use</span> <span class="ident">warp</span>::{<span class="ident">Rejection</span>, <span class="ident">Reply</span>};
 
+<span class="doccomment">/// Object instance.</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Object</span> {
     <span class="ident">class</span>: <span class="ident">String</span>,
     <span class="ident">id</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span>,
+    <span class="doccomment">/// Data of this object.</span>
     <span class="kw">pub</span> <span class="ident">data</span>: <span class="ident">Document</span>,
     <span class="ident">acl</span>: <span class="ident">Acl</span>,
     <span class="ident">ctx</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Context</span><span class="op">&gt;</span>,
     <span class="ident">user</span>: <span class="ident">UserKind</span>,
 }
 
+<span class="doccomment">/// Object trait used to generalize operations between objects and users.</span>
+<span class="attribute">#[<span class="ident">async_trait</span>::<span class="ident">async_trait</span>]</span>
+<span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">ObjectTrait</span> {
+    <span class="doccomment">/// Create a new object from current server context and the requesting user.</span>
+    <span class="kw">fn</span> <span class="ident">from_context</span>(<span class="ident">ctx</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Context</span><span class="op">&gt;</span>, <span class="ident">user</span>: <span class="ident">UserKind</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span>;
+
+    <span class="doccomment">/// Set ID of this object, which will be used to update this object by `save`.</span>
+    <span class="kw">fn</span> <span class="ident">set_id</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">id</span>: <span class="kw">impl</span> <span class="ident">Into</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span>);
+    <span class="doccomment">/// Set data of this object.</span>
+    <span class="kw">fn</span> <span class="ident">set_data</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">data</span>: <span class="kw">impl</span> <span class="ident">Into</span><span class="op">&lt;</span><span class="ident">Document</span><span class="op">&gt;</span>);
+
+    <span class="doccomment">/// Retrieve this object by `id`.</span>
+    <span class="ident">async</span> <span class="kw">fn</span> <span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">id</span>: <span class="ident">String</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Document</span>, <span class="ident">Rejection</span><span class="op">&gt;</span>;
+    <span class="doccomment">/// Update it if id is set before, else create a new object.</span>
+    <span class="ident">async</span> <span class="kw">fn</span> <span class="ident">save</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Document</span>, <span class="ident">Rejection</span><span class="op">&gt;</span>;
+    <span class="doccomment">/// Destroy this object by id set before.</span>
+    <span class="ident">async</span> <span class="kw">fn</span> <span class="ident">destroy</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Document</span>, <span class="ident">Rejection</span><span class="op">&gt;</span>;
+}
+
 <span class="kw">impl</span> <span class="ident">Object</span> {
-    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">ctx</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Context</span><span class="op">&gt;</span>, <span class="ident">user</span>: <span class="ident">UserKind</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
+    <span class="doccomment">/// Set class of this object.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">set_class</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">name</span>: <span class="kw">impl</span> <span class="ident">Into</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span>) {
+        <span class="self">self</span>.<span class="ident">class</span> <span class="op">=</span> <span class="ident">name</span>.<span class="ident">into</span>()
+    }
+
+    <span class="doccomment">/// Set access control flags of this object.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">set_acl</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">acl</span>: <span class="ident">Acl</span>) {
+        <span class="self">self</span>.<span class="ident">acl</span> <span class="op">=</span> <span class="ident">acl</span>;
+    }
+    <span class="doccomment">/// Get access control flags of this object.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_acl</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Acl</span> {
+        <span class="self">self</span>.<span class="ident">acl</span>.<span class="ident">clone</span>()
+    }
+}
+
+<span class="attribute">#[<span class="ident">async_trait</span>::<span class="ident">async_trait</span>]</span>
+<span class="kw">impl</span> <span class="ident">ObjectTrait</span> <span class="kw">for</span> <span class="ident">Object</span> {
+    <span class="kw">fn</span> <span class="ident">from_context</span>(<span class="ident">ctx</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Context</span><span class="op">&gt;</span>, <span class="ident">user</span>: <span class="ident">UserKind</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
         <span class="ident">Object</span> {
             <span class="ident">ctx</span>,
             <span class="ident">user</span>,
@@ -477,28 +544,16 @@
             <span class="ident">acl</span>: <span class="ident">Acl</span>::<span class="ident">default</span>(),
         }
     }
-
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">set_class</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">name</span>: <span class="kw">impl</span> <span class="ident">Into</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span>) {
-        <span class="self">self</span>.<span class="ident">class</span> <span class="op">=</span> <span class="ident">name</span>.<span class="ident">into</span>()
-    }
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">set_id</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">id</span>: <span class="kw">impl</span> <span class="ident">Into</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span>) {
+    <span class="kw">fn</span> <span class="ident">set_id</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">id</span>: <span class="kw">impl</span> <span class="ident">Into</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span>) {
         <span class="self">self</span>.<span class="ident">id</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">id</span>.<span class="ident">into</span>());
     }
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">set_doc</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">doc</span>: <span class="ident">Document</span>) {
-        <span class="self">self</span>.<span class="ident">data</span> <span class="op">=</span> <span class="ident">doc</span>;
-    }
-
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">set_acl</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">acl</span>: <span class="ident">Acl</span>) {
-        <span class="self">self</span>.<span class="ident">acl</span> <span class="op">=</span> <span class="ident">acl</span>;
-    }
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_acl</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Acl</span> {
-        <span class="self">self</span>.<span class="ident">acl</span>.<span class="ident">clone</span>()
+    <span class="kw">fn</span> <span class="ident">set_data</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">doc</span>: <span class="kw">impl</span> <span class="ident">Into</span><span class="op">&lt;</span><span class="ident">Document</span><span class="op">&gt;</span>) {
+        <span class="self">self</span>.<span class="ident">data</span> <span class="op">=</span> <span class="ident">doc</span>.<span class="ident">into</span>();
     }
 
     <span class="doccomment">/// Retrieve data from database by id.</span>
-    <span class="kw">pub</span> <span class="ident">async</span> <span class="kw">fn</span> <span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">id</span>: <span class="kw">impl</span> <span class="ident">Into</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Document</span>, <span class="ident">Rejection</span><span class="op">&gt;</span> {
+    <span class="ident">async</span> <span class="kw">fn</span> <span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">id</span>: <span class="ident">String</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Document</span>, <span class="ident">Rejection</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">id</span>: <span class="ident">String</span> <span class="op">=</span> <span class="ident">id</span>.<span class="ident">into</span>();
-
         <span class="kw">let</span> <span class="ident">filter</span> <span class="op">=</span> <span class="macro">doc</span><span class="macro">!</span> {<span class="ident">database</span>::<span class="ident">OBJECT_ID</span>: <span class="kw-2">&amp;</span><span class="ident">id</span> };
         <span class="kw">let</span> <span class="ident">result</span> <span class="op">=</span> (<span class="kw-2">*</span><span class="self">self</span>.<span class="ident">ctx</span>)
             .<span class="ident">db</span>
@@ -523,7 +578,7 @@
     }
 
     <span class="doccomment">/// Update if id is provided, else create a new one.</span>
-    <span class="kw">pub</span> <span class="ident">async</span> <span class="kw">fn</span> <span class="ident">save</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Document</span>, <span class="ident">Rejection</span><span class="op">&gt;</span> {
+    <span class="ident">async</span> <span class="kw">fn</span> <span class="ident">save</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Document</span>, <span class="ident">Rejection</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">doc</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">data</span>.<span class="ident">clone</span>();
 
         <span class="kw">match</span> <span class="self">self</span>.<span class="ident">user</span> {
@@ -556,7 +611,7 @@
         }
     }
 
-    <span class="kw">pub</span> <span class="ident">async</span> <span class="kw">fn</span> <span class="ident">destroy</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Document</span>, <span class="ident">Rejection</span><span class="op">&gt;</span> {
+    <span class="ident">async</span> <span class="kw">fn</span> <span class="ident">destroy</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Document</span>, <span class="ident">Rejection</span><span class="op">&gt;</span> {
         <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">id</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">id</span>.<span class="ident">clone</span>() {
             (<span class="kw-2">*</span><span class="self">self</span>.<span class="ident">ctx</span>)
                 .<span class="ident">db</span>
@@ -572,6 +627,7 @@
     }
 }
 
+<span class="doccomment">/// Create an object in specific class, used by RESTFul API.</span>
 <span class="kw">pub</span> <span class="ident">async</span> <span class="kw">fn</span> <span class="ident">create</span>(
     <span class="ident">class</span>: <span class="ident">ClassName</span>,
     <span class="kw-2">mut</span> <span class="ident">req</span>: <span class="ident">Request</span>,
@@ -583,9 +639,9 @@
         <span class="ident">req</span> <span class="op">=</span> <span class="ident">f</span>(<span class="ident">req</span>, <span class="ident">ctx</span>.<span class="ident">clone</span>()).<span class="ident">await</span><span class="question-mark">?</span>;
     };
     <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="kw-2">ref</span> <span class="ident">body</span>) <span class="op">=</span> <span class="ident">req</span>.<span class="ident">body</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">obj</span> <span class="op">=</span> <span class="ident">Object</span>::<span class="ident">from</span>(<span class="ident">ctx</span>.<span class="ident">clone</span>(), <span class="ident">req</span>.<span class="ident">user</span>.<span class="ident">clone</span>());
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">obj</span> <span class="op">=</span> <span class="ident">Object</span>::<span class="ident">from_context</span>(<span class="ident">ctx</span>.<span class="ident">clone</span>(), <span class="ident">req</span>.<span class="ident">user</span>.<span class="ident">clone</span>());
         <span class="ident">obj</span>.<span class="ident">set_class</span>(<span class="ident">class</span>);
-        <span class="ident">obj</span>.<span class="ident">set_doc</span>(<span class="ident">body</span>.<span class="ident">clone</span>()); <span class="comment">// FIXME: maybe after hook do not need body?</span>
+        <span class="ident">obj</span>.<span class="ident">set_data</span>(<span class="ident">body</span>.<span class="ident">clone</span>()); <span class="comment">// FIXME: maybe after hook do not need body?</span>
 
         <span class="kw">let</span> <span class="ident">result</span> <span class="op">=</span> <span class="ident">obj</span>.<span class="ident">save</span>().<span class="ident">await</span>.<span class="ident">and_then</span>(<span class="op">|</span><span class="ident">d</span><span class="op">|</span> {
             <span class="ident">serde_json</span>::<span class="ident">to_string</span>(<span class="kw-2">&amp;</span><span class="ident">d</span>)
@@ -642,6 +698,7 @@
     )
 }
 
+<span class="doccomment">/// Update an object with id in class, used by RESTFul API.</span>
 <span class="kw">pub</span> <span class="ident">async</span> <span class="kw">fn</span> <span class="ident">update</span>(
     <span class="ident">class</span>: <span class="ident">ClassName</span>,
     <span class="ident">id</span>: <span class="ident">String</span>,
@@ -654,10 +711,10 @@
         <span class="ident">req</span> <span class="op">=</span> <span class="ident">f</span>(<span class="ident">req</span>, <span class="ident">ctx</span>.<span class="ident">clone</span>()).<span class="ident">await</span><span class="question-mark">?</span>;
     };
     <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="kw-2">ref</span> <span class="ident">body</span>) <span class="op">=</span> <span class="ident">req</span>.<span class="ident">body</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">obj</span> <span class="op">=</span> <span class="ident">Object</span>::<span class="ident">from</span>(<span class="ident">ctx</span>.<span class="ident">clone</span>(), <span class="ident">req</span>.<span class="ident">user</span>.<span class="ident">clone</span>());
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">obj</span> <span class="op">=</span> <span class="ident">Object</span>::<span class="ident">from_context</span>(<span class="ident">ctx</span>.<span class="ident">clone</span>(), <span class="ident">req</span>.<span class="ident">user</span>.<span class="ident">clone</span>());
         <span class="ident">obj</span>.<span class="ident">set_class</span>(<span class="ident">class</span>);
         <span class="ident">obj</span>.<span class="ident">set_id</span>(<span class="ident">id</span>);
-        <span class="ident">obj</span>.<span class="ident">set_doc</span>(<span class="ident">body</span>.<span class="ident">clone</span>());
+        <span class="ident">obj</span>.<span class="ident">set_data</span>(<span class="ident">body</span>.<span class="ident">clone</span>());
 
         <span class="kw">let</span> <span class="ident">result</span> <span class="op">=</span> <span class="ident">obj</span>.<span class="ident">save</span>().<span class="ident">await</span>.<span class="ident">and_then</span>(<span class="op">|</span><span class="ident">d</span><span class="op">|</span> {
             <span class="ident">serde_json</span>::<span class="ident">to_string</span>(<span class="kw-2">&amp;</span><span class="ident">d</span>)
@@ -674,6 +731,7 @@
     }
 }
 
+<span class="doccomment">/// Delete an object in `class` by `id`, used by RESTFul API.</span>
 <span class="kw">pub</span> <span class="ident">async</span> <span class="kw">fn</span> <span class="ident">delete</span>(
     <span class="ident">class</span>: <span class="ident">ClassName</span>,
     <span class="ident">id</span>: <span class="ident">String</span>,
@@ -686,7 +744,7 @@
         <span class="ident">req</span> <span class="op">=</span> <span class="ident">f</span>(<span class="ident">req</span>, <span class="ident">ctx</span>.<span class="ident">clone</span>()).<span class="ident">await</span><span class="question-mark">?</span>;
     };
 
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">obj</span> <span class="op">=</span> <span class="ident">Object</span>::<span class="ident">from</span>(<span class="ident">ctx</span>.<span class="ident">clone</span>(), <span class="ident">req</span>.<span class="ident">user</span>.<span class="ident">clone</span>());
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">obj</span> <span class="op">=</span> <span class="ident">Object</span>::<span class="ident">from_context</span>(<span class="ident">ctx</span>.<span class="ident">clone</span>(), <span class="ident">req</span>.<span class="ident">user</span>.<span class="ident">clone</span>());
     <span class="ident">obj</span>.<span class="ident">set_class</span>(<span class="ident">class</span>);
     <span class="ident">obj</span>.<span class="ident">set_id</span>(<span class="ident">id</span>);
     <span class="kw">let</span> <span class="ident">result</span> <span class="op">=</span> <span class="ident">obj</span>.<span class="ident">destroy</span>().<span class="ident">await</span>.<span class="ident">and_then</span>(<span class="op">|</span><span class="ident">d</span><span class="op">|</span> {

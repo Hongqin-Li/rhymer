@@ -361,6 +361,7 @@
 <span id="358">358</span>
 <span id="359">359</span>
 <span id="360">360</span>
+<span id="361">361</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">collections</span>::<span class="ident">HashMap</span>;
 
@@ -517,6 +518,7 @@
     <span class="kw">use</span> <span class="ident">warp</span>::{<span class="ident">hyper</span>::<span class="ident">StatusCode</span>, <span class="ident">Rejection</span>};
 
     <span class="kw">use</span> <span class="kw">crate</span>::{
+        <span class="ident">object</span>::<span class="ident">ObjectTrait</span>,
         <span class="ident">server</span>::{<span class="ident">Context</span>, <span class="ident">Request</span>},
         <span class="ident">tests</span>::<span class="ident">test_server</span>,
         <span class="ident">user</span>::<span class="ident">UserKind</span>,
@@ -582,7 +584,7 @@
 
         <span class="kw">let</span> <span class="ident">data</span> <span class="op">=</span> <span class="macro">doc</span><span class="macro">!</span> { <span class="string">&quot;name&quot;</span>: <span class="string">&quot;a&quot;</span>};
         <span class="ident">obj</span>.<span class="ident">set_acl</span>(<span class="ident">acl</span>);
-        <span class="ident">obj</span>.<span class="ident">set_doc</span>(<span class="ident">data</span>);
+        <span class="ident">obj</span>.<span class="ident">set_data</span>(<span class="ident">data</span>);
         <span class="kw">let</span> <span class="ident">r</span> <span class="op">=</span> <span class="ident">obj</span>.<span class="ident">save</span>().<span class="ident">await</span><span class="question-mark">?</span>;
         <span class="prelude-val">Ok</span>(<span class="ident">r</span>.<span class="ident">get_str</span>(<span class="string">&quot;objectId&quot;</span>).<span class="ident">unwrap</span>().<span class="ident">to_string</span>())
     }

@@ -403,6 +403,9 @@
 <span id="400">400</span>
 <span id="401">401</span>
 <span id="402">402</span>
+<span id="403">403</span>
+<span id="404">404</span>
+<span id="405">405</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="ident">std</span>::{
     <span class="ident">collections</span>::<span class="ident">HashMap</span>,
@@ -420,7 +423,7 @@
     <span class="ident">database</span>::{<span class="ident">Database</span> <span class="kw">as</span> <span class="kw">_</span>, <span class="ident">Mongodb</span> <span class="kw">as</span> <span class="ident">Database</span>},
     <span class="ident">error</span>, <span class="ident">file</span>,
     <span class="ident">function</span>::{<span class="self">self</span>, <span class="ident">FileHook</span>, <span class="ident">FuncMap</span>, <span class="ident">Function</span>, <span class="ident">HookFunc</span>, <span class="ident">HookMap</span>},
-    <span class="ident">object</span>::{<span class="self">self</span>, <span class="ident">Object</span>},
+    <span class="ident">object</span>::{<span class="self">self</span>, <span class="ident">Object</span>, <span class="ident">ObjectTrait</span>},
     <span class="ident">user</span>::{<span class="self">self</span>, <span class="ident">User</span>, <span class="ident">UserKind</span>},
     <span class="ident">validator</span>::<span class="ident">ClassName</span>,
 };
@@ -471,20 +474,20 @@
 <span class="kw">impl</span> <span class="ident">Context</span> {
     <span class="doccomment">/// Login with username and password.</span>
     <span class="kw">pub</span> <span class="ident">async</span> <span class="kw">fn</span> <span class="ident">login</span>(<span class="self">self</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span>, <span class="ident">name</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>, <span class="ident">pwd</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">User</span>, ()<span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">u</span> <span class="op">=</span> <span class="ident">User</span>::<span class="ident">with_context</span>(<span class="self">self</span>);
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">u</span> <span class="op">=</span> <span class="ident">User</span>::<span class="ident">from_context</span>(<span class="self">self</span>, <span class="ident">UserKind</span>::<span class="ident">Master</span>);
         <span class="ident">u</span>.<span class="ident">login</span>(<span class="ident">name</span>, <span class="ident">pwd</span>).<span class="ident">await</span>.<span class="ident">map_or_else</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> <span class="prelude-val">Err</span>(()), <span class="op">|</span><span class="ident">t</span><span class="op">|</span> <span class="prelude-val">Ok</span>(<span class="ident">u</span>))
     }
 
     <span class="doccomment">/// Create an object in specific class.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">object</span>(<span class="self">self</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span>, <span class="ident">class</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Object</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">obj</span> <span class="op">=</span> <span class="ident">Object</span>::<span class="ident">from</span>(<span class="self">self</span>, <span class="ident">UserKind</span>::<span class="ident">Master</span>);
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">obj</span> <span class="op">=</span> <span class="ident">Object</span>::<span class="ident">from_context</span>(<span class="self">self</span>, <span class="ident">UserKind</span>::<span class="ident">Master</span>);
         <span class="ident">obj</span>.<span class="ident">set_class</span>(<span class="ident">class</span>);
         <span class="ident">obj</span>
     }
 
     <span class="doccomment">/// Create a user instance by id.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">user</span>(<span class="self">self</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span>, <span class="ident">id</span>: <span class="kw">impl</span> <span class="ident">Into</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">User</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">u</span> <span class="op">=</span> <span class="ident">User</span>::<span class="ident">with_context</span>(<span class="self">self</span>);
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">u</span> <span class="op">=</span> <span class="ident">User</span>::<span class="ident">from_context</span>(<span class="self">self</span>, <span class="ident">UserKind</span>::<span class="ident">Master</span>);
         <span class="ident">u</span>.<span class="ident">set_id</span>(<span class="ident">id</span>);
         <span class="ident">u</span>
     }
@@ -546,8 +549,8 @@
                     );
                     <span class="ident">body</span>
                 })
-                .<span class="ident">or</span>(<span class="ident">warp</span>::<span class="ident">any</span>().<span class="ident">map</span>(<span class="op">|</span><span class="op">|</span> <span class="prelude-val">None</span>))
-                .<span class="ident">unify</span>(),
+                <span class="comment">// .or(warp::any().map(|| None))</span>
+                <span class="comment">// .unify(),</span>
         )
         .<span class="ident">and</span>(<span class="ident">warp</span>::<span class="ident">any</span>().<span class="ident">map</span>(<span class="kw">move</span> <span class="op">|</span><span class="op">|</span> <span class="ident">key</span>.<span class="ident">clone</span>()))
         .<span class="ident">and_then</span>(
@@ -722,12 +725,15 @@
             }
         }
 
+        <span class="comment">// Be careful about the order to avoid consuming request body multiple times.</span>
+        <span class="kw">let</span> <span class="ident">update_user</span> <span class="op">=</span> <span class="macro">post</span><span class="macro">!</span>(<span class="ident">warp</span>::<span class="macro">path</span><span class="macro">!</span>(<span class="string">&quot;users&quot;</span> <span class="op">/</span> <span class="ident">String</span>)).<span class="ident">and_then</span>(<span class="ident">user</span>::<span class="ident">update</span>);
+
         <span class="kw">let</span> <span class="ident">signup</span> <span class="op">=</span> <span class="macro">post</span><span class="macro">!</span>(<span class="ident">warp</span>::<span class="ident">path</span>(<span class="string">&quot;users&quot;</span>)).<span class="ident">and_then</span>(<span class="ident">user</span>::<span class="ident">signup</span>);
 
         <span class="kw">let</span> <span class="ident">login</span> <span class="op">=</span>
             <span class="macro">get</span><span class="macro">!</span>(<span class="ident">warp</span>::<span class="ident">path</span>(<span class="string">&quot;login&quot;</span>), <span class="ident">warp</span>::<span class="ident">query</span>::<span class="op">&lt;</span><span class="ident">user</span>::<span class="ident">LoginQuery</span><span class="op">&gt;</span>()).<span class="ident">and_then</span>(<span class="ident">user</span>::<span class="ident">login</span>);
 
-        <span class="kw">let</span> <span class="ident">user_routes</span> <span class="op">=</span> <span class="ident">signup</span>.<span class="ident">or</span>(<span class="ident">login</span>);
+        <span class="kw">let</span> <span class="ident">user_routes</span> <span class="op">=</span> <span class="ident">update_user</span>.<span class="ident">or</span>(<span class="ident">signup</span>).<span class="ident">or</span>(<span class="ident">login</span>);
 
         <span class="kw">let</span> <span class="ident">create</span> <span class="op">=</span> <span class="macro">post</span><span class="macro">!</span>(<span class="ident">warp</span>::<span class="macro">path</span><span class="macro">!</span>(<span class="string">&quot;classes&quot;</span> <span class="op">/</span> <span class="ident">ClassName</span>)).<span class="ident">and_then</span>(<span class="ident">object</span>::<span class="ident">create</span>);
 
