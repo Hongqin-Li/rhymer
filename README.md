@@ -262,7 +262,9 @@ curl -X GET "http:localhost:8086/functions/Add?arg1=1&arg2=2"
 
 ### Initialize MongoDB
 
-Create a user with username, password and a database of name "rhymer-test".
+If you want to try on MongoDB docker, just run `sh scripts/initdb-docker.sh` and skip this section.
+
+Otherwise, you need to create a user with username, password and a database of name "rhymer-test".
 
 ```javascript
 // Login your admin user so that we can create new user.
