@@ -18,6 +18,7 @@ use log::trace;
 use pretty_env_logger;
 use rhymer::{
     error::{bad_request, internal_server_error, unauthorized},
+    object::ObjectTrait,
     user::UserKind,
     Acl, Config, Context, File, Rejection, Request, Server,
 };
@@ -49,7 +50,7 @@ async fn page_url(
         let url = external_url(&ns, &svc);
 
         let mut obj = ctx.object("_User");
-        obj.get(uid).await?;
+        obj.get(uid.clone()).await?;
         let purl = if let Some(purl) = obj.data.get("pageSourceUrl").map(|b| b.as_str().unwrap()) {
             purl
         } else {
@@ -227,7 +228,7 @@ async fn after_save_file(f: File, req: Request, ctx: Arc<Context>) -> Result<Fil
             acl.set_writable(c.id);
 
             let mut obj = ctx.object("UserFile");
-            obj.set_doc(data);
+            obj.set_data(data);
             obj.set_acl(acl);
             obj.save().await?;
 

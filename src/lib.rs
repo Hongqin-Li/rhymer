@@ -10,8 +10,10 @@ mod acl;
 mod database;
 mod file;
 mod function;
-mod object;
 mod server;
+
+/// Object.
+pub mod object;
 /// User.
 pub mod user;
 

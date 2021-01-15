@@ -14,7 +14,7 @@ use crate::{
     database::{Database as _, Mongodb as Database},
     error, file,
     function::{self, FileHook, FuncMap, Function, HookFunc, HookMap},
-    object::{self, Object},
+    object::{self, Object, ObjectTrait},
     user::{self, User, UserKind},
     validator::ClassName,
 };
@@ -65,20 +65,20 @@ pub struct Context {
 impl Context {
     /// Login with username and password.
     pub async fn login(self: Arc<Self>, name: &str, pwd: &str) -> Result<User, ()> {
-        let mut u = User::with_context(self);
+        let mut u = User::from_context(self, UserKind::Master);
         u.login(name, pwd).await.map_or_else(|e| Err(()), |t| Ok(u))
     }
 
     /// Create an object in specific class.
     pub fn object(self: Arc<Self>, class: &str) -> Object {
-        let mut obj = Object::from(self, UserKind::Master);
+        let mut obj = Object::from_context(self, UserKind::Master);
         obj.set_class(class);
         obj
     }
 
     /// Create a user instance by id.
     pub fn user(self: Arc<Self>, id: impl Into<String>) -> User {
-        let mut u = User::with_context(self);
+        let mut u = User::from_context(self, UserKind::Master);
         u.set_id(id);
         u
     }
@@ -140,8 +140,8 @@ fn with_req(
                     );
                     body
                 })
-                .or(warp::any().map(|| None))
-                .unify(),
+                // .or(warp::any().map(|| None))
+                // .unify(),
         )
         .and(warp::any().map(move || key.clone()))
         .and_then(
@@ -316,12 +316,15 @@ impl Server {
             }
         }
 
+        // Be careful about the order to avoid consuming request body multiple times.
+        let update_user = post!(warp::path!("users" / String)).and_then(user::update);
+
         let signup = post!(warp::path("users")).and_then(user::signup);
 
         let login =
             get!(warp::path("login"), warp::query::<user::LoginQuery>()).and_then(user::login);
 
-        let user_routes = signup.or(login);
+        let user_routes = update_user.or(signup).or(login);
 
         let create = post!(warp::path!("classes" / ClassName)).and_then(object::create);
 

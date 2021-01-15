@@ -3,8 +3,10 @@ use std::sync::Arc;
 use crate::{
     database::{self, Database},
     error::{self, conflict, internal_server_error, unauthorized},
+    object::ObjectTrait,
     server::{Context, Request},
     validator::{UserName, UserPassword},
+    Acl,
 };
 use error::bad_request;
 use mongodb::bson::{doc, Bson, Document};
@@ -41,49 +43,23 @@ pub enum UserKind {
 /// User instance.
 #[derive(Clone)]
 pub struct User {
-    data: Document,
-    kind: UserKind,
+    /// Data of current user.
+    pub data: Document,
+
+    id: Option<String>,
+
+    /// User that owns this user object.
+    user: UserKind,
     ctx: Arc<Context>,
 }
 
 impl User {
-    /// Create a user instance with server context.
-    pub fn with_context(ctx: Arc<Context>) -> Self {
-        User {
-            data: Document::default(),
-            kind: UserKind::Guest,
-            ctx,
-        }
-    }
-
-    /// Set Id of this user, which may be used by `save` without logging in.
-    pub fn set_id(&mut self, uid: impl Into<String>) {
-        let uid: String = uid.into();
-        let t = ClientToken {
-            sub: uid.clone(),
-            id: uid.clone(),
-            name: "$UNKNOWN".into(),
-            exp: 0,
-        };
-        self.kind = UserKind::Client(t);
-    }
+    const NAME: &'static str = "username";
+    const PWD: &'static str = "password";
 
     /// Set value by key of data of this user.
     pub fn set(&mut self, key: impl Into<String>, value: impl Into<Bson>) {
         self.data.insert(key, value);
-    }
-
-    /// Save current user's data.
-    pub async fn save(&self) -> Result<Document, Rejection> {
-        if let UserKind::Client(ref t) = self.kind {
-            let result = (*self.ctx)
-                .db
-                .update("_User", &t.id, self.data.clone(), UserKind::Master)
-                .await?;
-            Ok(result)
-        } else {
-            unauthorized("Please login first")
-        }
     }
 
     /// Sign up with username and password, updating this user instance.
@@ -94,20 +70,19 @@ impl User {
         name: &str,
         pwd: &str,
     ) -> Result<(Document, ClientToken), Rejection> {
-        let doc = doc! { "username": name, "password": pwd};
+        let doc = doc! { Self::NAME : name, Self::PWD : pwd};
         trace!("signup: name {}, pwd {}, doc {}", name, pwd, doc);
-        let result = (*self.ctx).db.create("_User", doc, UserKind::Master).await;
-        result.map(|d| {
-            let id = d.get_str(database::OBJECT_ID).unwrap().to_string();
-            let token = ClientToken {
-                sub: id.clone(),
-                exp: 10, // FIXME: use context config
-                id,
-                name: name.to_owned(),
-            };
-            self.kind = UserKind::Client(token.clone());
-            (d.to_owned(), token)
-        })
+        self.data = doc;
+        let d = self.save().await?;
+
+        let id = d.get_str(database::OBJECT_ID).unwrap().to_string();
+        let token = ClientToken {
+            sub: id.clone(),
+            exp: chrono::Utc::now().timestamp() + 900, // Expire after 15min.
+            id,
+            name: name.to_owned(),
+        };
+        Ok((d.to_owned(), token))
     }
 
     /// Log in with username and password, updating this user instance.
@@ -116,7 +91,7 @@ impl User {
         name: &str,
         pwd: &str,
     ) -> Result<(Document, ClientToken), Rejection> {
-        let filter = doc! {"username": name, "password": pwd};
+        let filter = doc! {Self::NAME: name, Self::PWD : pwd};
         trace!("login filter: {:?}", filter);
         let v = self
             .ctx
@@ -136,11 +111,99 @@ impl User {
                 name: name.to_owned(),
             };
             self.data = d.clone();
-            self.kind = UserKind::Client(token.clone());
+            // self.kind = UserKind::Client(token.clone());
             Ok((d.to_owned(), token))
         } else {
             unauthorized("")
         }
+    }
+}
+
+#[async_trait::async_trait]
+impl ObjectTrait for User {
+    fn from_context(ctx: Arc<Context>, user: UserKind) -> Self {
+        User {
+            data: Document::default(),
+            id: None,
+            user,
+            ctx,
+        }
+    }
+
+    fn set_id(&mut self, id: impl Into<String>) {
+        self.id = Some(id.into());
+    }
+    fn set_data(&mut self, data: impl Into<Document>) {
+        self.data = data.into();
+    }
+
+    async fn get(&mut self, id: String) -> Result<Document, Rejection> {
+        todo!();
+    }
+    async fn save(&mut self) -> Result<Document, Rejection> {
+        // Validate name and password.
+        let mut name = None;
+        let mut pwd = None;
+        if let Ok(s) = self.data.get_str(Self::NAME) {
+            if let Err(s) = s.to_string().parse::<UserName>() {
+                return bad_request("Cannot update with invalid username");
+            } else {
+                name = Some(s);
+            }
+        };
+        if let Ok(s) = self.data.get_str(Self::PWD) {
+            if let Err(s) = s.to_string().parse::<UserPassword>() {
+                return bad_request("Cannot update with invalid password");
+            } else {
+                pwd = Some(s)
+            }
+        };
+
+        if let Some(ref id) = self.id {
+            // Update
+            let result = match self.user.clone() {
+                UserKind::Client(t) => {
+                    if &t.id == id {
+                        // Client can update itself.
+                        (*self.ctx)
+                            .db
+                            .update("_User", id, self.data.clone(), self.user.clone())
+                            .await?
+                    } else {
+                        return unauthorized("Client is not allowed to update other user's data");
+                    }
+                }
+                // Guest cannot update username and password.
+                UserKind::Guest => {
+                    return unauthorized("Client is not allowed to update other user's data");
+                }
+                // Master can update anything
+                UserKind::Master => {
+                    (*self.ctx)
+                        .db
+                        .update("_User", id, self.data.clone(), self.user.clone())
+                        .await?
+                }
+            };
+            Ok(result)
+        } else {
+            // Create
+            if let (Some(name), Some(pwd)) = (name, pwd) {
+                let doc = (*self.ctx)
+                    .db
+                    .create("_User", self.data.clone(), self.user.clone())
+                    .await
+                    .map_or_else(|d| conflict("User exists"), |d| Ok(d))?;
+                self.data = doc.clone();
+                Ok(doc)
+            } else {
+                bad_request("Cannot create user without username or password")
+            }
+        }
+    }
+
+    async fn destroy(&mut self) -> Result<Document, Rejection> {
+        unimplemented!("Do not support destroying user")
     }
 }
 
@@ -185,47 +248,54 @@ pub struct LoginQuery {
     password: String,
 }
 
-pub(crate) async fn signup(req: Request, ctx: Arc<Context>) -> Result<impl Reply, Rejection> {
-    if let Some(body) = req.body {
-        trace!("signup: {}", body);
-        if let (Ok(name), Ok(pwd)) = (body.get_str("username"), body.get_str("password")) {
-            let name = name.to_string().parse::<UserName>();
-            let pwd = pwd.to_string().parse::<UserPassword>();
-            match (name, pwd) {
-                (Ok(name), Ok(pwd)) => {
-                    let mut user = User::with_context(ctx.clone());
-                    user.signup(name.as_str(), pwd.as_str()).await.map_or_else(
-                        |e| conflict("User exists"),
-                        |(mut d, t)| {
-                            let secret = ctx.config.secret.clone();
-                            d.insert("sessionToken", encode_token(&t, &secret)?);
-                            serde_json::to_string(&d).map_or_else(
-                                |_e| internal_server_error("Serialization error"),
-                                |s| {
-                                    Ok(warp::reply::with_status(s, warp::http::StatusCode::CREATED))
-                                },
-                            )
-                        },
-                    )
-                }
-                (Ok(_), Err(_)) => error::bad_request("Password invalid"),
-                (Err(_), _) => error::bad_request("User name invalid"),
-            }
-        } else {
-            bad_request("User name or password not provided in request body")
-        }
+/// Sign up with request, used by RESTFul API.
+pub async fn signup(req: Request, ctx: Arc<Context>) -> Result<impl Reply, Rejection> {
+    trace!("user signup");
+
+    if let Some(d) = req.body {
+        let mut user = User::from_context(ctx.clone(), req.user.clone());
+        user.set_data(d);
+        let mut d = user.save().await?;
+
+        let id = d.get_str(database::OBJECT_ID).unwrap().to_string();
+        let name = d.get_str(User::NAME).unwrap();
+
+        let token = ClientToken {
+            sub: id.clone(),
+            exp: chrono::Utc::now().timestamp() + 900, // Expire after 15min.
+            id,
+            name: name.to_owned(),
+        };
+
+        encode_token(&token, &ctx.config.secret).map_or_else(
+            |e| internal_server_error("Failed to encode JWT token"),
+            |t| {
+                d.insert("sessionToken", t);
+                Ok(())
+            },
+        )?;
+
+        let result = serde_json::to_string(&d)
+            .map_or_else(|e| internal_server_error("Serialization error"), |s| Ok(s))?;
+        Ok(warp::reply::with_status(
+            result,
+            warp::http::StatusCode::CREATED,
+        ))
     } else {
-        bad_request("Body not found")
+        bad_request("Failed to sign up with empty body")
     }
 }
 
-pub(crate) async fn login(
+/// Login with query of username and password, used by RESTFul API.
+pub async fn login(
     q: LoginQuery,
-    _req: Request,
+    req: Request,
     ctx: Arc<Context>,
 ) -> Result<impl Reply, Rejection> {
+    trace!("user login");
+
     let secret = ctx.config.secret.clone();
-    let mut user = User::with_context(ctx);
+    let mut user = User::from_context(ctx, req.user.clone());
     let result = user.login(&q.username, &q.password).await.map_or_else(
         |_e| unauthorized("User not found or password error"),
         |(mut d, t)| {
@@ -237,6 +307,24 @@ pub(crate) async fn login(
     result
 }
 
+/// Update user by id, used by RESTFul API.
+///
+/// Master can update any user and Client can only update itself.
+pub async fn update(id: String, req: Request, ctx: Arc<Context>) -> Result<impl Reply, Rejection> {
+    trace!("user update {}", &id);
+    if let Some(body) = req.body {
+        let mut user = User::from_context(ctx, req.user.clone());
+        user.set_id(id);
+        user.set_data(body);
+
+        let d = user.save().await?;
+        serde_json::to_string(&d)
+            .map_or_else(|e| internal_server_error("Serialization error"), |s| Ok(s))
+    } else {
+        bad_request("Cannot update user with empty body")
+    }
+}
+
 #[cfg(test)]
 pub(crate) mod tests {
     use std::sync::Arc;
@@ -244,7 +332,7 @@ pub(crate) mod tests {
     use serde_json::{json, Value};
     use warp::hyper::StatusCode;
 
-    use crate::tests::TEST_SERVER_KEY;
+    use crate::{tests::TEST_SERVER_KEY, with_user};
 
     use super::{super::tests::test_api, decode_token, encode_token, ClientToken};
 
@@ -383,5 +471,92 @@ pub(crate) mod tests {
         let resp = signup1!(&api, "foobar", "abcdef");
         assert_eq!(resp.status(), StatusCode::CONFLICT);
         debug!("resp {:?}", resp);
+    }
+
+    #[tokio::test]
+    async fn test_update() {
+        let api = test_api().await;
+
+        let update1 = async move |api, id, data| {
+            warp::test::request()
+                .method("POST")
+                .path(&format!("/users/{}", id))
+                .json(&data)
+                .reply(api)
+                .await
+        };
+        let update1_with_client = async move |api, uid, id, data| {
+            with_user!(uid, "POST")
+                .path(&format!("/users/{}", id))
+                .json(&data)
+                .reply(api)
+                .await
+        };
+        let update1_with_master = async move |api, id, data| {
+            warp::test::request()
+                .header("x-parse-master-key", TEST_SERVER_KEY)
+                .method("POST")
+                .path(&format!("/users/{}", id))
+                .json(&data)
+                .reply(api)
+                .await
+        };
+
+        let resp = signup1!(&api, "foobar", "12345");
+        let body: Value = serde_json::from_slice(&resp.body()[..]).unwrap();
+        let uid = body
+            .get("objectId")
+            .expect("failed to find objectId in user")
+            .as_str()
+            .expect("failed to convert into str");
+        assert_eq!(resp.status(), StatusCode::CREATED);
+
+        // Guest cannot update user.
+        let resp = update1(&api, uid, json!({"username": "abcdefg"})).await;
+        let body: Value = dbg!(serde_json::from_slice(&resp.body()[..]).unwrap());
+
+        assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
+
+        // Client cannot update other user.
+        let resp = update1_with_client(&api, uid, "other", json!({"username": "abcdefg"})).await;
+        assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
+
+        // Client cannot update with invalid username or password.
+        let resp = update1_with_client(&api, uid, uid, json!({"username": "a"})).await;
+        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+        let resp = update1_with_client(&api, uid, uid, json!({"password": "a"})).await;
+        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+
+        // Client can update itself.
+        let resp = update1_with_client(
+            &api,
+            uid,
+            uid,
+            json!({"username": "abcdefg", "password": "123456", "arbitrary": "data"}),
+        )
+        .await;
+        let body: Value = serde_json::from_slice(&resp.body()[..]).unwrap();
+        dbg!(&body);
+        // Should return value before update.
+        assert_eq!(body.get("username").unwrap().as_str().unwrap(), "foobar");
+        assert_eq!(body.get("objectId").unwrap().as_str().unwrap(), uid);
+        assert_eq!(body.get("arbitrary"), None);
+        assert_eq!(resp.status(), StatusCode::OK);
+
+        // Master can update any user.
+        let resp = update1_with_master(
+            &api,
+            uid,
+            json!({"username": "123456", "password": "0123456"}),
+        )
+        .await;
+        assert_eq!(resp.status(), StatusCode::OK);
+        let body: Value = serde_json::from_slice(&resp.body()[..]).unwrap();
+        dbg!(&body);
+        assert_eq!(body.get("username").unwrap().as_str().unwrap(), "abcdefg");
+        assert_eq!(body.get("password").unwrap().as_str().unwrap(), "123456");
+        assert_eq!(body.get("arbitrary").unwrap().as_str().unwrap(), "data");
+        assert_eq!(body.get("objectId").unwrap().as_str().unwrap(), uid);
+        assert_eq!(resp.status(), StatusCode::OK);
     }
 }

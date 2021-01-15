@@ -187,3 +187,5 @@ pub async fn delete(
         unauthorized("Only Master is allowed to delete files")
     }
 }
+
+// Tested in src/function.rs

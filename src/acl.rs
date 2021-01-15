@@ -153,6 +153,7 @@ mod tests {
     use warp::{hyper::StatusCode, Rejection};
 
     use crate::{
+        object::ObjectTrait,
         server::{Context, Request},
         tests::test_server,
         user::UserKind,
@@ -218,7 +219,7 @@ mod tests {
 
         let data = doc! { "name": "a"};
         obj.set_acl(acl);
-        obj.set_doc(data);
+        obj.set_data(data);
         let r = obj.save().await?;
         Ok(r.get_str("objectId").unwrap().to_string())
     }

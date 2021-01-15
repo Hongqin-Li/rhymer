@@ -11,17 +11,55 @@ use mongodb::bson::{doc, Document};
 use std::{result::Result, sync::Arc};
 use warp::{Rejection, Reply};
 
+/// Object instance.
 pub struct Object {
     class: String,
     id: Option<String>,
+    /// Data of this object.
     pub data: Document,
     acl: Acl,
     ctx: Arc<Context>,
     user: UserKind,
 }
 
+/// Object trait used to generalize operations between objects and users.
+#[async_trait::async_trait]
+pub trait ObjectTrait {
+    /// Create a new object from current server context and the requesting user.
+    fn from_context(ctx: Arc<Context>, user: UserKind) -> Self;
+
+    /// Set ID of this object, which will be used to update this object by `save`.
+    fn set_id(&mut self, id: impl Into<String>);
+    /// Set data of this object.
+    fn set_data(&mut self, data: impl Into<Document>);
+
+    /// Retrieve this object by `id`.
+    async fn get(&mut self, id: String) -> Result<Document, Rejection>;
+    /// Update it if id is set before, else create a new object.
+    async fn save(&mut self) -> Result<Document, Rejection>;
+    /// Destroy this object by id set before.
+    async fn destroy(&mut self) -> Result<Document, Rejection>;
+}
+
 impl Object {
-    pub(crate) fn from(ctx: Arc<Context>, user: UserKind) -> Self {
+    /// Set class of this object.
+    pub fn set_class(&mut self, name: impl Into<String>) {
+        self.class = name.into()
+    }
+
+    /// Set access control flags of this object.
+    pub fn set_acl(&mut self, acl: Acl) {
+        self.acl = acl;
+    }
+    /// Get access control flags of this object.
+    pub fn get_acl(&self) -> Acl {
+        self.acl.clone()
+    }
+}
+
+#[async_trait::async_trait]
+impl ObjectTrait for Object {
+    fn from_context(ctx: Arc<Context>, user: UserKind) -> Self {
         Object {
             ctx,
             user,
@@ -31,28 +69,16 @@ impl Object {
             acl: Acl::default(),
         }
     }
-
-    pub fn set_class(&mut self, name: impl Into<String>) {
-        self.class = name.into()
-    }
-    pub fn set_id(&mut self, id: impl Into<String>) {
+    fn set_id(&mut self, id: impl Into<String>) {
         self.id = Some(id.into());
     }
-    pub fn set_doc(&mut self, doc: Document) {
-        self.data = doc;
-    }
-
-    pub fn set_acl(&mut self, acl: Acl) {
-        self.acl = acl;
-    }
-    pub fn get_acl(&self) -> Acl {
-        self.acl.clone()
+    fn set_data(&mut self, doc: impl Into<Document>) {
+        self.data = doc.into();
     }
 
     /// Retrieve data from database by id.
-    pub async fn get(&mut self, id: impl Into<String>) -> Result<Document, Rejection> {
+    async fn get(&mut self, id: String) -> Result<Document, Rejection> {
         let id: String = id.into();
-
         let filter = doc! {database::OBJECT_ID: &id };
         let result = (*self.ctx)
             .db
@@ -77,7 +103,7 @@ impl Object {
     }
 
     /// Update if id is provided, else create a new one.
-    pub async fn save(&mut self) -> Result<Document, Rejection> {
+    async fn save(&mut self) -> Result<Document, Rejection> {
         let mut doc = self.data.clone();
 
         match self.user {
@@ -110,7 +136,7 @@ impl Object {
         }
     }
 
-    pub async fn destroy(&mut self) -> Result<Document, Rejection> {
+    async fn destroy(&mut self) -> Result<Document, Rejection> {
         if let Some(id) = self.id.clone() {
             (*self.ctx)
                 .db
@@ -126,6 +152,7 @@ impl Object {
     }
 }
 
+/// Create an object in specific class, used by RESTFul API.
 pub async fn create(
     class: ClassName,
     mut req: Request,
@@ -137,9 +164,9 @@ pub async fn create(
         req = f(req, ctx.clone()).await?;
     };
     if let Some(ref body) = req.body {
-        let mut obj = Object::from(ctx.clone(), req.user.clone());
+        let mut obj = Object::from_context(ctx.clone(), req.user.clone());
         obj.set_class(class);
-        obj.set_doc(body.clone()); // FIXME: maybe after hook do not need body?
+        obj.set_data(body.clone()); // FIXME: maybe after hook do not need body?
 
         let result = obj.save().await.and_then(|d| {
             serde_json::to_string(&d)
@@ -196,6 +223,7 @@ pub async fn retrieve(
     )
 }
 
+/// Update an object with id in class, used by RESTFul API.
 pub async fn update(
     class: ClassName,
     id: String,
@@ -208,10 +236,10 @@ pub async fn update(
         req = f(req, ctx.clone()).await?;
     };
     if let Some(ref body) = req.body {
-        let mut obj = Object::from(ctx.clone(), req.user.clone());
+        let mut obj = Object::from_context(ctx.clone(), req.user.clone());
         obj.set_class(class);
         obj.set_id(id);
-        obj.set_doc(body.clone());
+        obj.set_data(body.clone());
 
         let result = obj.save().await.and_then(|d| {
             serde_json::to_string(&d)
@@ -228,6 +256,7 @@ pub async fn update(
     }
 }
 
+/// Delete an object in `class` by `id`, used by RESTFul API.
 pub async fn delete(
     class: ClassName,
     id: String,
@@ -240,7 +269,7 @@ pub async fn delete(
         req = f(req, ctx.clone()).await?;
     };
 
-    let mut obj = Object::from(ctx.clone(), req.user.clone());
+    let mut obj = Object::from_context(ctx.clone(), req.user.clone());
     obj.set_class(class);
     obj.set_id(id);
     let result = obj.destroy().await.and_then(|d| {
